@@ -1,4 +1,5 @@
 import React from 'react';
+import { Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
@@ -49,10 +50,18 @@ export default function App() {
           },
         })}
       >
-        <Tab.Screen 
-          name="Home" 
-          component={HomeScreen} 
-          options={{ title: 'Moving Circle Therapy' }}
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            headerTitle: () => (
+              <Image
+                source={require('./assets/logo.png')}
+                style={{ width: 180, height: 40 }}
+                resizeMode="contain"
+              />
+            ),
+          }}
         />
         <Tab.Screen 
           name="Services" 
