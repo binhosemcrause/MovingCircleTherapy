@@ -5,16 +5,27 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { RootTabParamList } from '../navigation/types';
 
-const { width } = Dimensions.get('window');
+type Props = BottomTabScreenProps<RootTabParamList, 'Home'>;
 
-const HomeScreen = ({ navigation }) => {
-  const menuItems = [
+type IoniconName = keyof typeof Ionicons.glyphMap;
+
+interface MenuItem {
+  id: number;
+  title: string;
+  subtitle: string;
+  icon: IoniconName;
+  description: string;
+  color: string;
+}
+
+const HomeScreen = ({ navigation }: Props) => {
+  const menuItems: MenuItem[] = [
     {
       id: 1,
       title: 'Therapy for All',
@@ -33,12 +44,11 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
-  const renderMenuItem = (item) => (
+  const renderMenuItem = (item: MenuItem) => (
     <TouchableOpacity
       key={item.id}
       style={[styles.menuItem, { backgroundColor: item.color }]}
       onPress={() => {
-        // Navigate to respective screens when implemented
         console.log(`Navigating to ${item.title}`);
       }}
     >
@@ -57,7 +67,6 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Section */}
       <View style={styles.heroSection}>
         <View style={styles.heroContent}>
           <Text style={styles.heroTitle}>Moving Circle Therapy</Text>
@@ -70,7 +79,6 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Menu Section */}
       <View style={styles.menuSection}>
         <Text style={styles.sectionTitle}>What can we help you with?</Text>
         <View style={styles.menuContainer}>
@@ -78,7 +86,6 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Quick Actions */}
       <View style={styles.quickActionsSection}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsContainer}>
@@ -89,7 +96,7 @@ const HomeScreen = ({ navigation }) => {
             <Ionicons name="calendar" size={24} color={colors.accent} />
             <Text style={styles.quickActionText}>Book Appointment</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.quickActionButton}
             onPress={() => navigation.navigate('Services')}
@@ -100,7 +107,6 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Contact Info */}
       <View style={styles.contactSection}>
         <Text style={styles.sectionTitle}>Get in Touch</Text>
         <View style={styles.contactInfo}>
@@ -247,4 +253,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen; 
+export default HomeScreen;

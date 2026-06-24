@@ -8,7 +8,7 @@ export const colors = {
   black: '#000000',
   gray: '#E5E5E5',
   lightGray: '#F5F5F5',
-};
+} as const;
 
 export const fonts = {
   josefinSans: {
@@ -27,7 +27,7 @@ export const fonts = {
     medium: 'Arimo-Medium',
     bold: 'Arimo-Bold',
   },
-};
+} as const;
 
 export const spacing = {
   xs: 4,
@@ -36,7 +36,7 @@ export const spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
-};
+} as const;
 
 export const borderRadius = {
   sm: 4,
@@ -44,4 +44,4 @@ export const borderRadius = {
   lg: 12,
   xl: 16,
   round: 50,
-}; 
+} as const;

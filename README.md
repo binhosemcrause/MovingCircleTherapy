@@ -1,60 +1,61 @@
 # Moving Circle Therapy App
 
-A React Native Expo app for Moving Circle Therapy, providing a comprehensive platform for therapy services, appointment booking, and client management.
+A React Native Expo app for Moving Circle Therapy, providing a platform for therapy services, appointment booking, and client profile management.
+
+Built with **TypeScript**, **Expo SDK 54**, and React Native's **New Architecture**.
 
 ## Features
 
-### 🏠 Home Screen
-- **Therapy for All**: Access to comprehensive mental health support for all ages and backgrounds
-- **Resources**: Educational materials, self-help tools, and mental health resources
-- **Quick Actions**: Direct access to book appointments and view services
-- **Contact Information**: Easy access to therapy center contact details
+### Home Screen
+- **Therapy for All** and **Resources** menu cards with descriptions
+- **Quick Actions** to jump to Book and Services tabs
+- **Contact Information** (phone, email, address)
 
-### 🏥 Services Screen
-- **Individual Therapy**: One-on-one sessions tailored to specific needs
-- **Couples Therapy**: Relationship counseling and communication improvement
-- **Family Therapy**: Family dynamics and relationship building
-- **Group Therapy**: Peer support in a collaborative environment
-- **Specialized Services**: Anxiety & Depression, Trauma Therapy, Child & Adolescent, Substance Abuse
-- **Pricing Information**: Transparent pricing for all services
-- **Insurance Support**: Information about insurance acceptance
+### Services Screen
+- Eight therapy offerings with descriptions, duration, pricing, and feature lists
+- Individual, couples, family, group, and specialized services
+- Insurance and payment information section
 
-### 📅 Book Appointment Screen
-- **Appointment Booking Form**: Comprehensive form for scheduling sessions
-- **Service Selection**: Choose from available therapy services
-- **Time Slot Selection**: Flexible scheduling options
-- **Existing Appointments**: View and manage current appointments
-- **Login Integration**: Seamless connection with user profile
+### Book Appointment Screen
+- Appointment booking form (name, email, phone, service, date, time, notes)
+- Service and time slot pickers
+- Existing appointments list (when logged in)
+- Sign-in prompt for unauthenticated users
 
-### 👤 Profile Screen
-- **User Authentication**: Login and registration functionality
-- **Personal Information**: Complete user profile management
-- **Emergency Contacts**: Important contact information
-- **Insurance Details**: Insurance provider and policy information
-- **Account Settings**: Notification preferences and account management
-- **Logout Functionality**: Secure account logout
+### Profile Screen
+- Mock login and registration flows
+- User profile with personal, emergency contact, and insurance details
+- Account settings toggles and logout
 
 ## Design System
 
+Design tokens live in `src/utils/theme.ts`. Import `colors`, `fonts`, `spacing`, and `borderRadius` rather than hardcoding values.
+
 ### Colors
-- **Primary**: `#FEFAF5` (Warm off-white)
-- **Secondary**: `#8DB4D6` (Soft blue)
-- **Accent**: `#F2A477` (Warm orange)
+| Token | Value | Use |
+|---|---|---|
+| Primary | `#FEFAF5` | Backgrounds |
+| Secondary | `#8DB4D6` | Soft blue, inactive states |
+| Accent | `#F2A477` | Active states, CTAs |
 
 ### Typography
-- **Josefin Sans**: Headers and titles
-- **Garet**: Subheaders and emphasis text
-- **Arimo**: Body text and general content
+- **Josefin Sans** — headers and titles
+- **Garet** — subheaders and emphasis
+- **Arimo** — body text
 
-## Installation & Setup
+Custom fonts are defined in the theme and the `expo-font` plugin is configured, but font loading is not yet wired up in the app — system fonts are used as fallbacks until that is implemented.
 
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
-- Expo CLI
-- iOS Simulator (for iOS development) or Android Studio (for Android development)
+## Prerequisites
 
-### Installation Steps
+- **Node.js** 18+ (LTS recommended)
+- **npm**
+- **Expo Go** on a physical device (must match **SDK 54**), or:
+  - **Xcode** + iOS Simulator (macOS), or
+  - **Android Studio** + Android emulator
+
+A separate global Expo CLI install is not required — the project includes the `expo` package locally.
+
+## Getting Started
 
 1. **Clone the repository**
    ```bash
@@ -72,79 +73,97 @@ A React Native Expo app for Moving Circle Therapy, providing a comprehensive pla
    npm start
    ```
 
-4. **Run on your preferred platform**
+4. **Run the app**
+   - **Physical device:** Scan the QR code with Expo Go (Android) or the Camera app (iOS)
+   - **Simulator/emulator:**
+     ```bash
+     npm run ios       # iOS Simulator
+     npm run android   # Android emulator
+     ```
+
+   If you hit stale cache issues after upgrading dependencies:
    ```bash
-   # For iOS
-   npm run ios
-   
-   # For Android
-   npm run android
-   
-   # For web
-   npm run web
+   npm start -- --clear
    ```
+
+5. **Type-check** (optional)
+   ```bash
+   npm run typecheck
+   ```
+
+### Web
+
+Web support is not fully configured out of the box. To enable it, install the required packages:
+
+```bash
+npx expo install react-dom react-native-web @expo/metro-runtime
+```
+
+Then run `npm run web`.
 
 ## Project Structure
 
 ```
 MovingCircleTherapy/
-├── App.js                 # Main app component with navigation
+├── index.ts                    # App entry point
+├── App.tsx                     # Root component and bottom tab navigation
+├── app.json                    # Expo configuration
+├── tsconfig.json               # TypeScript configuration
+├── assets/                     # App icons, splash, logo
 ├── src/
-│   ├── screens/           # Screen components
-│   │   ├── HomeScreen.js
-│   │   ├── ServicesScreen.js
-│   │   ├── BookScreen.js
-│   │   └── ProfileScreen.js
-│   ├── components/        # Reusable components
-│   ├── navigation/        # Navigation configuration
-│   ├── utils/            # Utilities and theme
-│   │   └── theme.js      # Colors, fonts, spacing
-│   └── assets/           # Images and static assets
-├── package.json
-└── README.md
+│   ├── screens/                # Tab screen components
+│   │   ├── HomeScreen.tsx
+│   │   ├── ServicesScreen.tsx
+│   │   ├── BookScreen.tsx
+│   │   └── ProfileScreen.tsx
+│   ├── navigation/
+│   │   └── types.ts            # RootTabParamList for typed navigation
+│   └── utils/
+│       └── theme.ts            # Colors, fonts, spacing, borderRadius
+└── package.json
 ```
+
+**Navigation:** Single-level bottom tab navigator (`@react-navigation/bottom-tabs`). All screens are top-level tabs — there is no stack or nested navigation.
+
+**Entry flow:** `index.ts` → `App.tsx` → four tab screens
 
 ## Key Technologies
 
-- **React Native**: Cross-platform mobile development
-- **Expo**: Development platform and tools
-- **React Navigation**: Navigation between screens
-- **Expo Vector Icons**: Icon library
-- **React Native Vector Icons**: Additional icon support
+| Technology | Version / Notes |
+|---|---|
+| Expo SDK | 54 |
+| React Native | 0.81 |
+| React | 19 |
+| TypeScript | 5.9 |
+| React Navigation | Bottom tabs |
+| Expo Vector Icons | Tab and screen icons |
 
 ## Development Notes
 
 ### State Management
-The app uses React's built-in state management with `useState` hooks for local component state. For a production app, consider implementing:
-- Redux or Context API for global state
-- AsyncStorage for persistent data
-- Secure storage for authentication tokens
+Local `useState` only — no Redux, Context API, or global store.
 
 ### Authentication
-Currently implements mock authentication. For production:
-- Integrate with a backend authentication service
-- Implement secure token storage
-- Add biometric authentication options
+Mock authentication with no backend integration. Login and registration update local state only.
 
 ### Data Persistence
-For production implementation:
-- Connect to a backend API
-- Implement offline data caching
-- Add data synchronization
+No API or persistent storage yet. Appointments and profile data are hardcoded or held in component state.
 
-### Additional Features to Consider
+### Production Considerations
+- Backend API integration
+- Secure token storage and real authentication
+- Persistent data (e.g. AsyncStorage or a database)
 - Push notifications for appointment reminders
-- Video call integration for telehealth
-- Payment processing integration
-- Document upload for intake forms
-- Progress tracking and journaling features
+- Custom font loading via `expo-font`
+
+There is no lint or test setup in this project.
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Run `npm run typecheck` and test in Expo Go or a simulator
 5. Submit a pull request
 
 ## License
@@ -153,4 +172,4 @@ This project is licensed under the MIT License.
 
 ## Support
 
-For support or questions about the Moving Circle Therapy app, please contact the development team. 
+For support or questions about the Moving Circle Therapy app, please contact the development team.

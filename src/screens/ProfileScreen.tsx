@@ -12,23 +12,50 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
 
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+interface RegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  phone: string;
+}
+
+interface UserProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  insuranceProvider: string;
+  insuranceNumber: string;
+}
+
+const emptyLoginData: LoginData = { email: '', password: '' };
+
+const emptyRegisterData: RegisterData = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  phone: '',
+};
+
 const ProfileScreen = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: '',
-  });
-  const [registerData, setRegisterData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '',
-  });
-  const [userProfile, setUserProfile] = useState({
+  const [loginData, setLoginData] = useState<LoginData>(emptyLoginData);
+  const [registerData, setRegisterData] = useState<RegisterData>(emptyRegisterData);
+  const [userProfile] = useState<UserProfile>({
     firstName: 'Sarah',
     lastName: 'Johnson',
     email: 'sarah.johnson@email.com',
@@ -45,8 +72,7 @@ const ProfileScreen = () => {
       Alert.alert('Missing Information', 'Please enter both email and password.');
       return;
     }
-    
-    // Simulate login
+
     setIsLoggedIn(true);
     setShowLoginForm(false);
     setShowRegisterForm(false);
@@ -54,18 +80,17 @@ const ProfileScreen = () => {
   };
 
   const handleRegister = () => {
-    if (!registerData.firstName || !registerData.lastName || !registerData.email || 
+    if (!registerData.firstName || !registerData.lastName || !registerData.email ||
         !registerData.password || !registerData.confirmPassword) {
       Alert.alert('Missing Information', 'Please fill in all required fields.');
       return;
     }
-    
+
     if (registerData.password !== registerData.confirmPassword) {
       Alert.alert('Password Mismatch', 'Passwords do not match.');
       return;
     }
-    
-    // Simulate registration
+
     setIsLoggedIn(true);
     setShowLoginForm(false);
     setShowRegisterForm(false);
@@ -78,15 +103,12 @@ const ProfileScreen = () => {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
+        {
+          text: 'Logout',
           onPress: () => {
             setIsLoggedIn(false);
-            setLoginData({ email: '', password: '' });
-            setRegisterData({
-              firstName: '', lastName: '', email: '', password: '',
-              confirmPassword: '', phone: ''
-            });
+            setLoginData(emptyLoginData);
+            setRegisterData(emptyRegisterData);
           }
         },
       ]
@@ -96,13 +118,13 @@ const ProfileScreen = () => {
   const renderLoginForm = () => (
     <View style={styles.formContainer}>
       <Text style={styles.formTitle}>Sign In</Text>
-      
+
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Email Address</Text>
         <TextInput
           style={styles.textInput}
           value={loginData.email}
-          onChangeText={(text) => setLoginData({...loginData, email: text})}
+          onChangeText={(text) => setLoginData({ ...loginData, email: text })}
           placeholder="Enter your email"
           keyboardType="email-address"
           autoCapitalize="none"
@@ -114,7 +136,7 @@ const ProfileScreen = () => {
         <TextInput
           style={styles.textInput}
           value={loginData.password}
-          onChangeText={(text) => setLoginData({...loginData, password: text})}
+          onChangeText={(text) => setLoginData({ ...loginData, password: text })}
           placeholder="Enter your password"
           secureTextEntry
         />
@@ -124,7 +146,7 @@ const ProfileScreen = () => {
         <Text style={styles.submitButtonText}>Sign In</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.linkButton}
         onPress={() => {
           setShowLoginForm(false);
@@ -139,24 +161,24 @@ const ProfileScreen = () => {
   const renderRegisterForm = () => (
     <View style={styles.formContainer}>
       <Text style={styles.formTitle}>Create Account</Text>
-      
+
       <View style={styles.row}>
         <View style={[styles.inputGroup, { flex: 1, marginRight: spacing.sm }]}>
           <Text style={styles.inputLabel}>First Name *</Text>
           <TextInput
             style={styles.textInput}
             value={registerData.firstName}
-            onChangeText={(text) => setRegisterData({...registerData, firstName: text})}
+            onChangeText={(text) => setRegisterData({ ...registerData, firstName: text })}
             placeholder="First name"
           />
         </View>
-        
+
         <View style={[styles.inputGroup, { flex: 1, marginLeft: spacing.sm }]}>
           <Text style={styles.inputLabel}>Last Name *</Text>
           <TextInput
             style={styles.textInput}
             value={registerData.lastName}
-            onChangeText={(text) => setRegisterData({...registerData, lastName: text})}
+            onChangeText={(text) => setRegisterData({ ...registerData, lastName: text })}
             placeholder="Last name"
           />
         </View>
@@ -167,7 +189,7 @@ const ProfileScreen = () => {
         <TextInput
           style={styles.textInput}
           value={registerData.email}
-          onChangeText={(text) => setRegisterData({...registerData, email: text})}
+          onChangeText={(text) => setRegisterData({ ...registerData, email: text })}
           placeholder="Enter your email"
           keyboardType="email-address"
           autoCapitalize="none"
@@ -179,7 +201,7 @@ const ProfileScreen = () => {
         <TextInput
           style={styles.textInput}
           value={registerData.phone}
-          onChangeText={(text) => setRegisterData({...registerData, phone: text})}
+          onChangeText={(text) => setRegisterData({ ...registerData, phone: text })}
           placeholder="Enter your phone number"
           keyboardType="phone-pad"
         />
@@ -190,7 +212,7 @@ const ProfileScreen = () => {
         <TextInput
           style={styles.textInput}
           value={registerData.password}
-          onChangeText={(text) => setRegisterData({...registerData, password: text})}
+          onChangeText={(text) => setRegisterData({ ...registerData, password: text })}
           placeholder="Create a password"
           secureTextEntry
         />
@@ -201,7 +223,7 @@ const ProfileScreen = () => {
         <TextInput
           style={styles.textInput}
           value={registerData.confirmPassword}
-          onChangeText={(text) => setRegisterData({...registerData, confirmPassword: text})}
+          onChangeText={(text) => setRegisterData({ ...registerData, confirmPassword: text })}
           placeholder="Confirm your password"
           secureTextEntry
         />
@@ -211,7 +233,7 @@ const ProfileScreen = () => {
         <Text style={styles.submitButtonText}>Create Account</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.linkButton}
         onPress={() => {
           setShowRegisterForm(false);
@@ -235,7 +257,7 @@ const ProfileScreen = () => {
 
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
-        
+
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Ionicons name="person-outline" size={20} color={colors.secondary} />
@@ -244,7 +266,7 @@ const ProfileScreen = () => {
               <Text style={styles.infoValue}>{userProfile.firstName} {userProfile.lastName}</Text>
             </View>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Ionicons name="mail-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
@@ -252,7 +274,7 @@ const ProfileScreen = () => {
               <Text style={styles.infoValue}>{userProfile.email}</Text>
             </View>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Ionicons name="call-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
@@ -260,7 +282,7 @@ const ProfileScreen = () => {
               <Text style={styles.infoValue}>{userProfile.phone}</Text>
             </View>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Ionicons name="calendar-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
@@ -273,7 +295,7 @@ const ProfileScreen = () => {
 
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle}>Emergency Contact</Text>
-        
+
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Ionicons name="person-outline" size={20} color={colors.secondary} />
@@ -282,7 +304,7 @@ const ProfileScreen = () => {
               <Text style={styles.infoValue}>{userProfile.emergencyContact}</Text>
             </View>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Ionicons name="call-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
@@ -295,7 +317,7 @@ const ProfileScreen = () => {
 
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle}>Insurance Information</Text>
-        
+
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Ionicons name="medical-outline" size={20} color={colors.secondary} />
@@ -304,7 +326,7 @@ const ProfileScreen = () => {
               <Text style={styles.infoValue}>{userProfile.insuranceProvider}</Text>
             </View>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Ionicons name="card-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
@@ -317,7 +339,7 @@ const ProfileScreen = () => {
 
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle}>Account Settings</Text>
-        
+
         <View style={styles.settingsCard}>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
@@ -331,7 +353,7 @@ const ProfileScreen = () => {
               thumbColor={colors.white}
             />
           </View>
-          
+
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Ionicons name="mail-outline" size={20} color={colors.secondary} />
@@ -373,16 +395,16 @@ const ProfileScreen = () => {
             <Text style={styles.welcomeSubtitle}>
               Create an account or sign in to access your profile, book appointments, and manage your therapy journey.
             </Text>
-            
+
             <View style={styles.authButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.authButton}
                 onPress={() => setShowLoginForm(true)}
               >
                 <Text style={styles.authButtonText}>Sign In</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.authButton, styles.registerButton]}
                 onPress={() => setShowRegisterForm(true)}
               >
@@ -624,4 +646,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen; 
+export default ProfileScreen;

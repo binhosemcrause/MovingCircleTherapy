@@ -12,20 +12,43 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
 
-const BookScreen = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showForm, setShowForm] = useState(true);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    service: '',
-    date: '',
-    time: '',
-    notes: '',
-  });
+interface AppointmentFormData {
+  name: string;
+  email: string;
+  phone: string;
+  service: string;
+  date: string;
+  time: string;
+  notes: string;
+}
 
-  const existingAppointments = [
+type AppointmentStatus = 'confirmed' | 'pending';
+
+interface Appointment {
+  id: number;
+  service: string;
+  date: string;
+  time: string;
+  therapist: string;
+  status: AppointmentStatus;
+}
+
+const emptyFormData: AppointmentFormData = {
+  name: '',
+  email: '',
+  phone: '',
+  service: '',
+  date: '',
+  time: '',
+  notes: '',
+};
+
+const BookScreen = () => {
+  const [isLoggedIn] = useState(false);
+  const [showForm, setShowForm] = useState(true);
+  const [formData, setFormData] = useState<AppointmentFormData>(emptyFormData);
+
+  const existingAppointments: Appointment[] = [
     {
       id: 1,
       service: 'Individual Therapy',
@@ -65,17 +88,15 @@ const BookScreen = () => {
       Alert.alert('Missing Information', 'Please fill in all required fields.');
       return;
     }
-    
+
     Alert.alert(
       'Appointment Requested',
       'Your appointment request has been submitted. We will contact you within 24 hours to confirm.',
-      [{ text: 'OK', onPress: () => setFormData({
-        name: '', email: '', phone: '', service: '', date: '', time: '', notes: ''
-      })}]
+      [{ text: 'OK', onPress: () => setFormData(emptyFormData) }]
     );
   };
 
-  const renderAppointmentCard = (appointment) => (
+  const renderAppointmentCard = (appointment: Appointment) => (
     <View key={appointment.id} style={styles.appointmentCard}>
       <View style={styles.appointmentHeader}>
         <Text style={styles.appointmentService}>{appointment.service}</Text>
@@ -88,7 +109,7 @@ const BookScreen = () => {
           </Text>
         </View>
       </View>
-      
+
       <View style={styles.appointmentDetails}>
         <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={16} color={colors.secondary} />
@@ -103,7 +124,7 @@ const BookScreen = () => {
           <Text style={styles.detailText}>{appointment.therapist}</Text>
         </View>
       </View>
-      
+
       <View style={styles.appointmentActions}>
         <TouchableOpacity style={styles.actionButton}>
           <Ionicons name="call-outline" size={16} color={colors.accent} />
@@ -120,13 +141,13 @@ const BookScreen = () => {
   const renderBookingForm = () => (
     <View style={styles.formContainer}>
       <Text style={styles.formTitle}>Book Your Appointment</Text>
-      
+
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Full Name *</Text>
         <TextInput
           style={styles.textInput}
           value={formData.name}
-          onChangeText={(text) => setFormData({...formData, name: text})}
+          onChangeText={(text) => setFormData({ ...formData, name: text })}
           placeholder="Enter your full name"
         />
       </View>
@@ -136,7 +157,7 @@ const BookScreen = () => {
         <TextInput
           style={styles.textInput}
           value={formData.email}
-          onChangeText={(text) => setFormData({...formData, email: text})}
+          onChangeText={(text) => setFormData({ ...formData, email: text })}
           placeholder="Enter your email"
           keyboardType="email-address"
         />
@@ -147,7 +168,7 @@ const BookScreen = () => {
         <TextInput
           style={styles.textInput}
           value={formData.phone}
-          onChangeText={(text) => setFormData({...formData, phone: text})}
+          onChangeText={(text) => setFormData({ ...formData, phone: text })}
           placeholder="Enter your phone number"
           keyboardType="phone-pad"
         />
@@ -169,7 +190,7 @@ const BookScreen = () => {
                 styles.optionItem,
                 formData.service === service && styles.selectedOption
               ]}
-              onPress={() => setFormData({...formData, service})}
+              onPress={() => setFormData({ ...formData, service })}
             >
               <Text style={[
                 styles.optionText,
@@ -188,11 +209,11 @@ const BookScreen = () => {
           <TextInput
             style={styles.textInput}
             value={formData.date}
-            onChangeText={(text) => setFormData({...formData, date: text})}
+            onChangeText={(text) => setFormData({ ...formData, date: text })}
             placeholder="MM/DD/YYYY"
           />
         </View>
-        
+
         <View style={[styles.inputGroup, { flex: 1, marginLeft: spacing.sm }]}>
           <Text style={styles.inputLabel}>Preferred Time *</Text>
           <View style={styles.pickerContainer}>
@@ -209,7 +230,7 @@ const BookScreen = () => {
                   styles.optionItem,
                   formData.time === time && styles.selectedOption
                 ]}
-                onPress={() => setFormData({...formData, time})}
+                onPress={() => setFormData({ ...formData, time })}
               >
                 <Text style={[
                   styles.optionText,
@@ -228,7 +249,7 @@ const BookScreen = () => {
         <TextInput
           style={[styles.textInput, styles.textArea]}
           value={formData.notes}
-          onChangeText={(text) => setFormData({...formData, notes: text})}
+          onChangeText={(text) => setFormData({ ...formData, notes: text })}
           placeholder="Any specific concerns or preferences..."
           multiline
           numberOfLines={4}
@@ -527,4 +548,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BookScreen; 
+export default BookScreen;

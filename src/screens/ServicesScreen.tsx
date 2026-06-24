@@ -5,15 +5,24 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
 
-const { width } = Dimensions.get('window');
+type IoniconName = keyof typeof Ionicons.glyphMap;
+
+interface Service {
+  id: number;
+  title: string;
+  description: string;
+  duration: string;
+  price: string;
+  icon: IoniconName;
+  features: string[];
+}
 
 const ServicesScreen = () => {
-  const services = [
+  const services: Service[] = [
     {
       id: 1,
       title: 'Individual Therapy',
@@ -88,7 +97,7 @@ const ServicesScreen = () => {
     },
   ];
 
-  const renderService = (service) => (
+  const renderService = (service: Service) => (
     <View key={service.id} style={styles.serviceCard}>
       <View style={styles.serviceHeader}>
         <View style={styles.serviceIconContainer}>
@@ -99,7 +108,7 @@ const ServicesScreen = () => {
           <Text style={styles.serviceDescription}>{service.description}</Text>
         </View>
       </View>
-      
+
       <View style={styles.serviceDetails}>
         <View style={styles.detailItem}>
           <Ionicons name="time-outline" size={16} color={colors.secondary} />
@@ -142,10 +151,10 @@ const ServicesScreen = () => {
       <View style={styles.infoSection}>
         <Text style={styles.infoTitle}>Insurance & Payment</Text>
         <Text style={styles.infoText}>
-          We accept most major insurance plans and offer sliding scale fees for those in need. 
+          We accept most major insurance plans and offer sliding scale fees for those in need.
           Contact us to discuss payment options and insurance coverage.
         </Text>
-        
+
         <View style={styles.contactInfo}>
           <Text style={styles.contactTitle}>Questions about services?</Text>
           <TouchableOpacity style={styles.contactButton}>
@@ -315,4 +324,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ServicesScreen; 
+export default ServicesScreen;
