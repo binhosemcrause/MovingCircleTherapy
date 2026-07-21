@@ -1,4 +1,12 @@
-# Moving Circle Therapy App
+# Moving Circle Therapy
+
+This repo is organized into three top-level folders:
+
+- `mobile/` — the React Native Expo app (all current code lives here)
+- `frontend/` — placeholder for a future web frontend (no code yet)
+- `backend/` — placeholder for a future backend API (no code yet)
+
+## Mobile App
 
 A React Native Expo app for Moving Circle Therapy, providing a platform for therapy services, appointment booking, and client profile management.
 
@@ -60,7 +68,7 @@ A separate global Expo CLI install is not required — the project includes the 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd MovingCircleTherapy
+   cd MovingCircleTherapy/mobile
    ```
 
 2. **Install dependencies**
@@ -105,22 +113,25 @@ Then run `npm run web`.
 
 ```
 MovingCircleTherapy/
-├── index.ts                    # App entry point
-├── App.tsx                     # Root component and bottom tab navigation
-├── app.json                    # Expo configuration
-├── tsconfig.json               # TypeScript configuration
-├── assets/                     # App icons, splash, logo
-├── src/
-│   ├── screens/                # Tab screen components
-│   │   ├── HomeScreen.tsx
-│   │   ├── ServicesScreen.tsx
-│   │   ├── BookScreen.tsx
-│   │   └── ProfileScreen.tsx
-│   ├── navigation/
-│   │   └── types.ts            # RootTabParamList for typed navigation
-│   └── utils/
-│       └── theme.ts            # Colors, fonts, spacing, borderRadius
-└── package.json
+├── mobile/                     # React Native Expo app (this app)
+│   ├── index.ts                # App entry point
+│   ├── App.tsx                 # Root component and bottom tab navigation
+│   ├── app.json                # Expo configuration
+│   ├── tsconfig.json           # TypeScript configuration
+│   ├── assets/                 # App icons, splash, logo
+│   ├── src/
+│   │   ├── screens/            # Tab screen components
+│   │   │   ├── HomeScreen.tsx
+│   │   │   ├── ServicesScreen.tsx
+│   │   │   ├── BookScreen.tsx
+│   │   │   └── ProfileScreen.tsx
+│   │   ├── navigation/
+│   │   │   └── types.ts        # RootTabParamList for typed navigation
+│   │   └── utils/
+│   │       └── theme.ts        # Colors, fonts, spacing, borderRadius
+│   └── package.json
+├── frontend/                   # Placeholder for future web frontend
+└── backend/                    # Placeholder for future backend API
 ```
 
 **Navigation:** Single-level bottom tab navigator (`@react-navigation/bottom-tabs`). All screens are top-level tabs — there is no stack or nested navigation.
