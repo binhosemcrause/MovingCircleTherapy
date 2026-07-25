@@ -1,0 +1,784 @@
+openapi: 3.0.3
+info:
+  title: Moving Circle Therapy API
+  description: >-
+    Backend API for the Moving Circle Therapy mobile app. Provides
+    authentication, service listings, appointment booking, user profiles,
+    educational resources, and contact enquiries.
+  version: 1.0.0
+  contact:
+    name: Moving Circle Therapy
+    email: info@movingcircletherapy.com
+servers:
+  - url: https://api.movingcircletherapy.com/v1
+    description: Production
+  - url: https://staging-api.movingcircletherapy.com/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Registration, login, and token management
+  - name: Services
+    description: Therapy services offered
+  - name: Appointments
+    description: Book and manage therapy appointments
+  - name: Profile
+    description: Authenticated user profile
+  - name: Resources
+    description: Educational materials, articles, and worksheets
+  - name: Enquiries
+    description: Contact / get-in-touch messages
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ----------------------------------------------------------------- Auth
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Create a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate the current refresh token
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ------------------------------------------------------------- Services
+  /services:
+    get:
+      tags: [Services]
+      summary: List all therapy services
+      security: []
+      parameters:
+        - name: category
+          in: query
+          description: Filter by service category
+          schema:
+            $ref: '#/components/schemas/ServiceCategory'
+      responses:
+        '200':
+          description: A list of services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+    post:
+      tags: [Services]
+      summary: Create a new therapy service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+      responses:
+        '201':
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /services/{serviceId}:
+    get:
+      tags: [Services]
+      summary: Get a single service
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: The service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # --------------------------------------------------------- Appointments
+  /appointments:
+    get:
+      tags: [Appointments]
+      summary: List the authenticated user's appointments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AppointmentStatus'
+      responses:
+        '200':
+          description: The user's appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Appointments]
+      summary: Book a new appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+      responses:
+        '201':
+          description: Appointment booked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Requested slot is no longer available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /appointments/{appointmentId}:
+    get:
+      tags: [Appointments]
+      summary: Get a single appointment
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+      responses:
+        '200':
+          description: The appointment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Appointments]
+      summary: Reschedule an appointment
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scheduledAt:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Appointment updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Appointments]
+      summary: Cancel an appointment
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+      responses:
+        '204':
+          description: Appointment cancelled
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /services/{serviceId}/availability:
+    get:
+      tags: [Appointments]
+      summary: List available booking slots for a service
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AvailabilitySlot'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ------------------------------------------------------------- Profile
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Get the authenticated user's profile
+      responses:
+        '200':
+          description: The user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Profile]
+      summary: Update the authenticated user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdate'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ------------------------------------------------------------ Resources
+  /resources:
+    get:
+      tags: [Resources]
+      summary: List educational resources
+      security: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/ResourceType'
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Resource'
+
+  /resources/{resourceId}:
+    get:
+      tags: [Resources]
+      summary: Get a single resource
+      security: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ------------------------------------------------------------ Enquiries
+  /enquiries:
+    post:
+      tags: [Enquiries]
+      summary: Submit a contact / get-in-touch enquiry
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnquiryRequest'
+      responses:
+        '201':
+          description: Enquiry received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enquiry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ServiceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AppointmentId:
+      name: appointmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ---- Enums
+    ServiceCategory:
+      type: string
+      enum:
+        - counselling
+        - creative_arts_therapy
+        - therapeutic_workshops
+        - family_therapy
+        - couple_movement_therapy
+        - creative_arts_classes
+
+    AppointmentStatus:
+      type: string
+      enum: [pending, confirmed, completed, cancelled]
+
+    SessionFormat:
+      type: string
+      enum: [in_person, virtual]
+
+    ResourceType:
+      type: string
+      enum: [article, worksheet, video, tool]
+
+    # ---- Auth
+    RegisterRequest:
+      type: object
+      required: [firstName, lastName, email, password]
+      properties:
+        firstName:
+          type: string
+          example: Jane
+        lastName:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+        phone:
+          type: string
+          example: "+1 555 123 4567"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT bearer token
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          description: Access token lifetime in seconds
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+
+    # ---- User / Profile
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ProfileUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+
+    # ---- Services
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Counselling
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        description:
+          type: string
+          example: One-on-one sessions tailored to your specific needs and goals.
+        durationMinutes:
+          type: object
+          properties:
+            min:
+              type: integer
+              example: 50
+            max:
+              type: integer
+              example: 60
+        price:
+          type: number
+          format: float
+          example: 120.00
+        currency:
+          type: string
+          example: USD
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionFormat'
+        features:
+          type: array
+          items:
+            type: string
+          example:
+            - Personalized treatment plan
+            - Flexible scheduling
+            - In-person or virtual
+
+    ServiceRequest:
+      type: object
+      required: [name, category, durationMinutes, price, formats]
+      properties:
+        name:
+          type: string
+          example: Counselling
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        description:
+          type: string
+          example: One-on-one sessions tailored to your specific needs and goals.
+        durationMinutes:
+          type: object
+          required: [min, max]
+          properties:
+            min:
+              type: integer
+              example: 50
+            max:
+              type: integer
+              example: 60
+        price:
+          type: number
+          format: float
+          example: 120.00
+        currency:
+          type: string
+          example: USD
+          default: USD
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionFormat'
+          minItems: 1
+        features:
+          type: array
+          items:
+            type: string
+          example:
+            - Personalized treatment plan
+            - Flexible scheduling
+            - In-person or virtual
+
+    # ---- Availability
+    AvailabilitySlot:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        available:
+          type: boolean
+
+    # ---- Appointments
+    AppointmentRequest:
+      type: object
+      required: [serviceId, scheduledAt]
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+        scheduledAt:
+          type: string
+          format: date-time
+        format:
+          $ref: '#/components/schemas/SessionFormat'
+        notes:
+          type: string
+          description: Optional notes for the therapist
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        service:
+          $ref: '#/components/schemas/Service'
+        userId:
+          type: string
+          format: uuid
+        scheduledAt:
+          type: string
+          format: date-time
+        format:
+          $ref: '#/components/schemas/SessionFormat'
+        status:
+          $ref: '#/components/schemas/AppointmentStatus'
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---- Resources
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/ResourceType'
+        summary:
+          type: string
+        url:
+          type: string
+          format: uri
+        publishedAt:
+          type: string
+          format: date-time
+
+    # ---- Enquiries
+    EnquiryRequest:
+      type: object
+      required: [name, email, message]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        subject:
+          type: string
+        message:
+          type: string
+
+    Enquiry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        subject:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---- Errors
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: Email is already registered.
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              issue:
+                type: string

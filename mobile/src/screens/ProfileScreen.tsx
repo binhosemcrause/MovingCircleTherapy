@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { ApiError, ApiUser, loginUser, registerUser } from '../api/auth';
 
 interface LoginData {
   email: string;
@@ -26,18 +27,6 @@ interface RegisterData {
   phone: string;
 }
 
-interface UserProfile {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  insuranceProvider: string;
-  insuranceNumber: string;
-}
-
 const emptyLoginData: LoginData = { email: '', password: '' };
 
 const emptyRegisterData: RegisterData = {
@@ -49,37 +38,48 @@ const emptyRegisterData: RegisterData = {
   phone: '',
 };
 
+function describeApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.details?.length) {
+      return error.details.map((detail) => detail.issue).join('\n');
+    }
+    return error.message;
+  }
+  return 'Could not reach the server. Please check your connection and try again.';
+}
+
 const ProfileScreen = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [loginData, setLoginData] = useState<LoginData>(emptyLoginData);
   const [registerData, setRegisterData] = useState<RegisterData>(emptyRegisterData);
-  const [userProfile] = useState<UserProfile>({
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    email: 'sarah.johnson@email.com',
-    phone: '+1 (555) 123-4567',
-    dateOfBirth: '1985-03-15',
-    emergencyContact: 'John Johnson',
-    emergencyPhone: '+1 (555) 987-6543',
-    insuranceProvider: 'Blue Cross Blue Shield',
-    insuranceNumber: 'BCBS123456789',
-  });
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!loginData.email || !loginData.password) {
       Alert.alert('Missing Information', 'Please enter both email and password.');
       return;
     }
 
-    setIsLoggedIn(true);
-    setShowLoginForm(false);
-    setShowRegisterForm(false);
-    Alert.alert('Success', 'Welcome back!');
+    setIsSubmitting(true);
+    try {
+      const result = await loginUser({ email: loginData.email, password: loginData.password });
+      setApiUser(result.user);
+      setIsLoggedIn(true);
+      setShowLoginForm(false);
+      setShowRegisterForm(false);
+      setLoginData(emptyLoginData);
+      Alert.alert('Success', 'Welcome back!');
+    } catch (error) {
+      Alert.alert('Sign In Failed', describeApiError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!registerData.firstName || !registerData.lastName || !registerData.email ||
         !registerData.password || !registerData.confirmPassword) {
       Alert.alert('Missing Information', 'Please fill in all required fields.');
@@ -91,10 +91,26 @@ const ProfileScreen = () => {
       return;
     }
 
-    setIsLoggedIn(true);
-    setShowLoginForm(false);
-    setShowRegisterForm(false);
-    Alert.alert('Success', 'Account created successfully!');
+    setIsSubmitting(true);
+    try {
+      const result = await registerUser({
+        firstName: registerData.firstName,
+        lastName: registerData.lastName,
+        email: registerData.email,
+        password: registerData.password,
+        phone: registerData.phone || undefined,
+      });
+      setApiUser(result.user);
+      setIsLoggedIn(true);
+      setShowLoginForm(false);
+      setShowRegisterForm(false);
+      setRegisterData(emptyRegisterData);
+      Alert.alert('Success', 'Account created successfully!');
+    } catch (error) {
+      Alert.alert('Registration Failed', describeApiError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleLogout = () => {
@@ -107,6 +123,7 @@ const ProfileScreen = () => {
           text: 'Logout',
           onPress: () => {
             setIsLoggedIn(false);
+            setApiUser(null);
             setLoginData(emptyLoginData);
             setRegisterData(emptyRegisterData);
           }
@@ -142,8 +159,12 @@ const ProfileScreen = () => {
         />
       </View>
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleLogin}>
-        <Text style={styles.submitButtonText}>Sign In</Text>
+      <TouchableOpacity
+        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+        onPress={handleLogin}
+        disabled={isSubmitting}
+      >
+        <Text style={styles.submitButtonText}>{isSubmitting ? 'Signing In…' : 'Sign In'}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -229,8 +250,12 @@ const ProfileScreen = () => {
         />
       </View>
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleRegister}>
-        <Text style={styles.submitButtonText}>Create Account</Text>
+      <TouchableOpacity
+        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+        onPress={handleRegister}
+        disabled={isSubmitting}
+      >
+        <Text style={styles.submitButtonText}>{isSubmitting ? 'Creating Account…' : 'Create Account'}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -251,8 +276,8 @@ const ProfileScreen = () => {
         <View style={styles.avatarContainer}>
           <Ionicons name="person-circle" size={80} color={colors.white} />
         </View>
-        <Text style={styles.userName}>{userProfile.firstName} {userProfile.lastName}</Text>
-        <Text style={styles.userEmail}>{userProfile.email}</Text>
+        <Text style={styles.userName}>{apiUser?.firstName} {apiUser?.lastName}</Text>
+        <Text style={styles.userEmail}>{apiUser?.email}</Text>
       </View>
 
       <View style={styles.profileSection}>
@@ -263,7 +288,7 @@ const ProfileScreen = () => {
             <Ionicons name="person-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{userProfile.firstName} {userProfile.lastName}</Text>
+              <Text style={styles.infoValue}>{apiUser?.firstName} {apiUser?.lastName}</Text>
             </View>
           </View>
 
@@ -271,7 +296,7 @@ const ProfileScreen = () => {
             <Ionicons name="mail-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{userProfile.email}</Text>
+              <Text style={styles.infoValue}>{apiUser?.email}</Text>
             </View>
           </View>
 
@@ -279,7 +304,7 @@ const ProfileScreen = () => {
             <Ionicons name="call-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Phone</Text>
-              <Text style={styles.infoValue}>{userProfile.phone}</Text>
+              <Text style={styles.infoValue}>{apiUser?.phone ?? 'Not provided'}</Text>
             </View>
           </View>
 
@@ -287,7 +312,7 @@ const ProfileScreen = () => {
             <Ionicons name="calendar-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Date of Birth</Text>
-              <Text style={styles.infoValue}>{userProfile.dateOfBirth}</Text>
+              <Text style={styles.infoValue}>Not provided</Text>
             </View>
           </View>
         </View>
@@ -301,7 +326,7 @@ const ProfileScreen = () => {
             <Ionicons name="person-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Contact Name</Text>
-              <Text style={styles.infoValue}>{userProfile.emergencyContact}</Text>
+              <Text style={styles.infoValue}>Not provided</Text>
             </View>
           </View>
 
@@ -309,7 +334,7 @@ const ProfileScreen = () => {
             <Ionicons name="call-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Contact Phone</Text>
-              <Text style={styles.infoValue}>{userProfile.emergencyPhone}</Text>
+              <Text style={styles.infoValue}>Not provided</Text>
             </View>
           </View>
         </View>
@@ -323,7 +348,7 @@ const ProfileScreen = () => {
             <Ionicons name="medical-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Provider</Text>
-              <Text style={styles.infoValue}>{userProfile.insuranceProvider}</Text>
+              <Text style={styles.infoValue}>Not provided</Text>
             </View>
           </View>
 
@@ -331,7 +356,7 @@ const ProfileScreen = () => {
             <Ionicons name="card-outline" size={20} color={colors.secondary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Policy Number</Text>
-              <Text style={styles.infoValue}>{userProfile.insuranceNumber}</Text>
+              <Text style={styles.infoValue}>Not provided</Text>
             </View>
           </View>
         </View>
@@ -380,7 +405,12 @@ const ProfileScreen = () => {
 
   if (!isLoggedIn) {
     return (
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.loggedOutContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
           <Text style={styles.headerSubtitle}>
@@ -417,7 +447,7 @@ const ProfileScreen = () => {
         ) : (
           renderRegisterForm()
         )}
-      </View>
+      </ScrollView>
     );
   }
 
@@ -428,6 +458,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
+  },
+  loggedOutContent: {
+    flexGrow: 1,
   },
   header: {
     backgroundColor: colors.secondary,
@@ -527,6 +560,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     alignItems: 'center',
     marginTop: spacing.lg,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     fontSize: 18,
