@@ -1,110 +1,81 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { ApiError } from '../api/client';
+import { ApiService, listServices } from '../api/services';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
-interface Service {
-  id: number;
-  title: string;
-  description: string;
-  duration: string;
-  price: string;
-  icon: IoniconName;
-  features: string[];
+const CATEGORY_ICONS: Record<string, IoniconName> = {
+  counselling: 'person-outline',
+  creative_arts_therapy: 'color-palette-outline',
+  therapeutic_workshops: 'people-circle-outline',
+  family_therapy: 'home-outline',
+  couple_movement_therapy: 'body-outline',
+  creative_arts_classes: 'brush-outline',
+};
+
+const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£' };
+
+function formatDuration({ min, max }: ApiService['durationMinutes']): string {
+  return min === max ? `${min} minutes` : `${min}-${max} minutes`;
+}
+
+function formatPrice(price: number, currency: string): string {
+  const symbol = CURRENCY_SYMBOLS[currency];
+  return symbol ? `${symbol}${price}/session` : `${price} ${currency}/session`;
+}
+
+function formatFormat(format: 'in_person' | 'virtual'): string {
+  return format === 'in_person' ? 'In person' : 'Virtual';
 }
 
 const ServicesScreen = () => {
-  const services: Service[] = [
-    {
-      id: 1,
-      title: 'Individual Therapy',
-      description: 'One-on-one sessions tailored to your specific needs and goals.',
-      duration: '50-60 minutes',
-      price: '$120/session',
-      icon: 'person-outline',
-      features: ['Personalized treatment plan', 'Flexible scheduling', 'In-person or virtual'],
-    },
-    {
-      id: 2,
-      title: 'Couples Therapy',
-      description: 'Work together to improve communication and strengthen your relationship.',
-      duration: '75-90 minutes',
-      price: '$150/session',
-      icon: 'people-outline',
-      features: ['Conflict resolution', 'Communication skills', 'Relationship building'],
-    },
-    {
-      id: 3,
-      title: 'Family Therapy',
-      description: 'Address family dynamics and create healthier relationships.',
-      duration: '75-90 minutes',
-      price: '$150/session',
-      icon: 'home-outline',
-      features: ['Family dynamics', 'Parenting support', 'Intergenerational issues'],
-    },
-    {
-      id: 4,
-      title: 'Group Therapy',
-      description: 'Connect with others facing similar challenges in a supportive environment.',
-      duration: '90 minutes',
-      price: '$60/session',
-      icon: 'people-circle-outline',
-      features: ['Peer support', 'Shared experiences', 'Cost-effective'],
-    },
-    {
-      id: 5,
-      title: 'Anxiety & Depression',
-      description: 'Specialized treatment for anxiety disorders and depression.',
-      duration: '50-60 minutes',
-      price: '$130/session',
-      icon: 'heart-outline',
-      features: ['CBT techniques', 'Mindfulness practices', 'Coping strategies'],
-    },
-    {
-      id: 6,
-      title: 'Trauma Therapy',
-      description: 'Safe and supportive treatment for trauma and PTSD.',
-      duration: '60-75 minutes',
-      price: '$140/session',
-      icon: 'shield-outline',
-      features: ['EMDR therapy', 'Trauma-informed care', 'Safety planning'],
-    },
-    {
-      id: 7,
-      title: 'Child & Adolescent',
-      description: 'Age-appropriate therapy for children and teenagers.',
-      duration: '45-50 minutes',
-      price: '$110/session',
-      icon: 'happy-outline',
-      features: ['Play therapy', 'School collaboration', 'Parent involvement'],
-    },
-    {
-      id: 8,
-      title: 'Substance Abuse',
-      description: 'Comprehensive treatment for substance use disorders.',
-      duration: '60-75 minutes',
-      price: '$140/session',
-      icon: 'medical-outline',
-      features: ['Recovery support', 'Relapse prevention', 'Family education'],
-    },
-  ];
+  const [services, setServices] = useState<ApiService[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const renderService = (service: Service) => (
+  const fetchServices = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await listServices();
+      setServices(data);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not load services. Please check your connection and try again.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  const renderService = (service: ApiService) => (
     <View key={service.id} style={styles.serviceCard}>
       <View style={styles.serviceHeader}>
         <View style={styles.serviceIconContainer}>
-          <Ionicons name={service.icon} size={28} color={colors.accent} />
+          <Ionicons
+            name={CATEGORY_ICONS[service.category] ?? 'medical-outline'}
+            size={28}
+            color={colors.accent}
+          />
         </View>
         <View style={styles.serviceInfo}>
-          <Text style={styles.serviceTitle}>{service.title}</Text>
+          <Text style={styles.serviceTitle}>{service.name}</Text>
           <Text style={styles.serviceDescription}>{service.description}</Text>
         </View>
       </View>
@@ -112,13 +83,23 @@ const ServicesScreen = () => {
       <View style={styles.serviceDetails}>
         <View style={styles.detailItem}>
           <Ionicons name="time-outline" size={16} color={colors.secondary} />
-          <Text style={styles.detailText}>{service.duration}</Text>
+          <Text style={styles.detailText}>{formatDuration(service.durationMinutes)}</Text>
         </View>
         <View style={styles.detailItem}>
           <Ionicons name="card-outline" size={16} color={colors.secondary} />
-          <Text style={styles.detailText}>{service.price}</Text>
+          <Text style={styles.detailText}>{formatPrice(service.price, service.currency)}</Text>
         </View>
       </View>
+
+      {service.formats.length > 0 && (
+        <View style={styles.formatsContainer}>
+          {service.formats.map((format) => (
+            <View key={format} style={styles.formatBadge}>
+              <Text style={styles.formatBadgeText}>{formatFormat(format)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.featuresContainer}>
         {service.features.map((feature, index) => (
@@ -135,6 +116,38 @@ const ServicesScreen = () => {
     </View>
   );
 
+  const renderServicesContent = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.stateContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.stateContainer}>
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textLight} />
+          <Text style={styles.stateText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchServices}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (services.length === 0) {
+      return (
+        <View style={styles.stateContainer}>
+          <Text style={styles.stateText}>No services available right now. Please check back soon.</Text>
+        </View>
+      );
+    }
+
+    return services.map(renderService);
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
@@ -145,7 +158,7 @@ const ServicesScreen = () => {
       </View>
 
       <View style={styles.servicesContainer}>
-        {services.map(renderService)}
+        {renderServicesContent()}
       </View>
 
       <View style={styles.infoSection}>
@@ -193,6 +206,28 @@ const styles = StyleSheet.create({
   },
   servicesContainer: {
     padding: spacing.lg,
+  },
+  stateContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.md,
+  },
+  stateText: {
+    fontSize: 16,
+    fontFamily: fonts.arimo.regular,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontFamily: fonts.garet.bold,
+    color: colors.white,
   },
   serviceCard: {
     backgroundColor: colors.white,
@@ -255,6 +290,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.garet.medium,
     color: colors.text,
+  },
+  formatsContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  formatBadge: {
+    backgroundColor: colors.lightGray,
+    borderRadius: borderRadius.round,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  formatBadgeText: {
+    fontSize: 12,
+    fontFamily: fonts.garet.medium,
+    color: colors.textLight,
   },
   featuresContainer: {
     marginBottom: spacing.md,

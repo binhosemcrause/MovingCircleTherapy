@@ -1,0 +1,29 @@
+sequenceDiagram
+    actor User
+    participant App as ProfileScreen
+    participant AuthApi as auth.ts
+    participant Backend as AuthController
+    participant Hash as BcryptPasswordHasher
+    participant DB as Postgres
+
+    User->>App: Enter email + password
+    App->>AuthApi: loginUser() / registerUser()
+    AuthApi->>Backend: POST /v1/auth/login (or /register)
+
+    alt Register
+        Backend->>DB: findByEmail (must be free)
+        Backend->>Hash: hash(password)
+        Backend->>DB: INSERT users
+    else Login
+        Backend->>DB: findByEmail
+        Backend->>Hash: compare(password, hash)
+    end
+    Note over Backend: Same "Invalid email or password"<br/>error either way — no user enumeration
+
+    Backend->>Backend: sign accessToken (short TTL)<br/>+ refreshToken (long TTL, unique jti)
+    Backend->>DB: INSERT refresh_tokens<br/>(SHA-256 hash of refreshToken only)
+    Backend-->>AuthApi: 200 { accessToken, refreshToken, expiresIn, user }
+    AuthApi-->>App: AuthResponse
+
+    App->>App: setApiUser(user)<br/>setIsLoggedIn(true)
+    Note over App: accessToken / refreshToken end here —<br/>never stored, never attached to later requests

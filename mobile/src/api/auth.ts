@@ -1,4 +1,6 @@
-import { API_BASE_URL } from './config';
+import { apiFetch, ApiError } from './client';
+
+export { ApiError };
 
 export interface ApiUser {
   id: string;
@@ -29,36 +31,8 @@ export interface LoginPayload {
   password: string;
 }
 
-export interface ApiErrorDetail {
-  field?: string;
-  issue: string;
-}
-
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly details?: ApiErrorDetail[],
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-async function postAuth(path: string, payload: unknown): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new ApiError(data.message ?? 'Request failed.', response.status, data.details);
-  }
-
-  return data as AuthResponse;
+function postAuth(path: string, payload: unknown): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>(path, { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export function registerUser(payload: RegisterPayload): Promise<AuthResponse> {
