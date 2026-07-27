@@ -8,6 +8,8 @@ import {
   TextInput,
   Alert,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
@@ -405,49 +407,54 @@ const ProfileScreen = () => {
 
   if (!isLoggedIn) {
     return (
-      <ScrollView
+      <KeyboardAvoidingView
         style={styles.container}
-        contentContainerStyle={styles.loggedOutContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <Text style={styles.headerSubtitle}>
-            Sign in to access your account and manage your appointments
-          </Text>
-        </View>
-
-        {!showLoginForm && !showRegisterForm ? (
-          <View style={styles.welcomeContainer}>
-            <Ionicons name="person-circle-outline" size={80} color={colors.secondary} />
-            <Text style={styles.welcomeTitle}>Welcome to Moving Circle Therapy</Text>
-            <Text style={styles.welcomeSubtitle}>
-              Create an account or sign in to access your profile, book appointments, and manage your therapy journey.
+        <ScrollView
+          contentContainerStyle={styles.loggedOutContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <Text style={styles.headerSubtitle}>
+              Sign in to access your account and manage your appointments
             </Text>
-
-            <View style={styles.authButtons}>
-              <TouchableOpacity
-                style={styles.authButton}
-                onPress={() => setShowLoginForm(true)}
-              >
-                <Text style={styles.authButtonText}>Sign In</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.authButton, styles.registerButton]}
-                onPress={() => setShowRegisterForm(true)}
-              >
-                <Text style={[styles.authButtonText, { color: colors.accent }]}>Create Account</Text>
-              </TouchableOpacity>
-            </View>
           </View>
-        ) : showLoginForm ? (
-          renderLoginForm()
-        ) : (
-          renderRegisterForm()
-        )}
-      </ScrollView>
+
+          {!showLoginForm && !showRegisterForm ? (
+            <View style={styles.welcomeContainer}>
+              <Ionicons name="person-circle-outline" size={80} color={colors.secondary} />
+              <Text style={styles.welcomeTitle}>Welcome to Moving Circle Therapy</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Create an account or sign in to access your profile, book appointments, and manage your therapy journey.
+              </Text>
+
+              <View style={styles.authButtons}>
+                <TouchableOpacity
+                  style={styles.authButton}
+                  onPress={() => setShowLoginForm(true)}
+                >
+                  <Text style={styles.authButtonText}>Sign In</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.authButton, styles.registerButton]}
+                  onPress={() => setShowRegisterForm(true)}
+                >
+                  <Text style={[styles.authButtonText, { color: colors.accent }]}>Create Account</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : showLoginForm ? (
+            renderLoginForm()
+          ) : (
+            renderRegisterForm()
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -461,6 +468,7 @@ const styles = StyleSheet.create({
   },
   loggedOutContent: {
     flexGrow: 1,
+    paddingBottom: spacing.xxl,
   },
   header: {
     backgroundColor: colors.secondary,
