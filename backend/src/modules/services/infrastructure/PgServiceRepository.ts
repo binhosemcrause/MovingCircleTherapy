@@ -1,7 +1,21 @@
 import type { Pool } from 'pg';
 import type { ServiceCategory, SessionFormat } from '../../../shared/domain/enums';
-import type { CreateServiceInput, IServiceRepository, ListServicesFilter } from '../domain/IServiceRepository';
-import type { Service } from '../domain/Service';
+import { ConflictError } from '../../../shared/errors/AppError';
+import type {
+  CreateServiceInput,
+  IServiceRepository,
+  ListServicesFilter,
+  UpdateServiceInput,
+} from '../domain/IServiceRepository';
+import type { Service, ServiceSummary } from '../domain/Service';
+
+const FOREIGN_KEY_VIOLATION = '23503';
+
+interface ServiceSummaryRow {
+  id: string;
+  name: string;
+  category: ServiceCategory;
+}
 
 interface ServiceRow {
   id: string;
@@ -34,6 +48,14 @@ const SELECT_SERVICE = `
   from services s
 `;
 
+function toServiceSummary(row: ServiceSummaryRow): ServiceSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+  };
+}
+
 function toService(row: ServiceRow): Service {
   return {
     id: row.id,
@@ -53,12 +75,14 @@ function toService(row: ServiceRow): Service {
 export class PgServiceRepository implements IServiceRepository {
   constructor(private readonly pool: Pool) {}
 
-  async findAll(filter: ListServicesFilter): Promise<Service[]> {
-    const result = await this.pool.query<ServiceRow>(
-      `${SELECT_SERVICE} where $1::service_category is null or s.category = $1 order by s.name`,
+  async findAll(filter: ListServicesFilter): Promise<ServiceSummary[]> {
+    const result = await this.pool.query<ServiceSummaryRow>(
+      `select id, name, category from services
+       where $1::service_category is null or category = $1
+       order by name`,
       [filter.category ?? null],
     );
-    return result.rows.map(toService);
+    return result.rows.map(toServiceSummary);
   }
 
   async findById(id: string): Promise<Service | null> {
@@ -110,4 +134,85 @@ export class PgServiceRepository implements IServiceRepository {
       client.release();
     }
   }
+
+  async update(id: string, input: UpdateServiceInput): Promise<Service | null> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+
+      const updated = await client.query<{ id: string }>(
+        `update services set
+           name = coalesce($2, name),
+           category = coalesce($3, category),
+           description = coalesce($4, description),
+           duration_min_minutes = coalesce($5, duration_min_minutes),
+           duration_max_minutes = coalesce($6, duration_max_minutes),
+           price = coalesce($7, price),
+           currency = coalesce($8, currency)
+         where id = $1
+         returning id`,
+        [
+          id,
+          input.name ?? null,
+          input.category ?? null,
+          input.description ?? null,
+          input.durationMinutes?.min ?? null,
+          input.durationMinutes?.max ?? null,
+          input.price ?? null,
+          input.currency ?? null,
+        ],
+      );
+
+      if (updated.rows.length === 0) {
+        await client.query('rollback');
+        return null;
+      }
+
+      if (input.formats) {
+        await client.query(`delete from service_formats where service_id = $1`, [id]);
+        for (const format of input.formats) {
+          await client.query(`insert into service_formats (service_id, format) values ($1, $2)`, [id, format]);
+        }
+      }
+
+      if (input.features) {
+        await client.query(`delete from service_features where service_id = $1`, [id]);
+        for (const [position, feature] of input.features.entries()) {
+          await client.query(
+            `insert into service_features (service_id, feature, position) values ($1, $2, $3)`,
+            [id, feature, position],
+          );
+        }
+      }
+
+      await client.query('commit');
+
+      const result = await client.query<ServiceRow>(`${SELECT_SERVICE} where s.id = $1`, [id]);
+      return toService(result.rows[0]!);
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const result = await this.pool.query(`delete from services where id = $1`, [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictError(
+          'Cannot delete a service that has existing appointments.',
+          'service_has_appointments',
+        );
+      }
+      throw error;
+    }
+  }
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === FOREIGN_KEY_VIOLATION;
 }

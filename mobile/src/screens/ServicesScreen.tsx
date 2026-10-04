@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, spacing, borderRadius } from '../utils/theme';
 import { ApiError } from '../api/client';
-import { ApiService, listServices } from '../api/services';
+import { ApiService, ApiServiceSummary, getService, listServices } from '../api/services';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -20,6 +20,7 @@ const CATEGORY_ICONS: Record<string, IoniconName> = {
   therapeutic_workshops: 'people-circle-outline',
   family_therapy: 'home-outline',
   couple_movement_therapy: 'body-outline',
+  dance_movement_therapy: 'walk-outline',
   creative_arts_classes: 'brush-outline',
 };
 
@@ -39,9 +40,16 @@ function formatFormat(format: 'in_person' | 'virtual'): string {
 }
 
 const ServicesScreen = () => {
-  const [services, setServices] = useState<ApiService[]>([]);
+  const [services, setServices] = useState<ApiServiceSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Selecting a card from the list fetches its full details on demand via
+  // GET /services/:id, rather than the list endpoint carrying every field.
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [selectedService, setSelectedService] = useState<ApiService | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const fetchServices = useCallback(async () => {
     setIsLoading(true);
@@ -64,56 +72,51 @@ const ServicesScreen = () => {
     fetchServices();
   }, [fetchServices]);
 
-  const renderService = (service: ApiService) => (
-    <View key={service.id} style={styles.serviceCard}>
-      <View style={styles.serviceHeader}>
-        <View style={styles.serviceIconContainer}>
-          <Ionicons
-            name={CATEGORY_ICONS[service.category] ?? 'medical-outline'}
-            size={28}
-            color={colors.accent}
-          />
-        </View>
-        <View style={styles.serviceInfo}>
-          <Text style={styles.serviceTitle}>{service.name}</Text>
-          <Text style={styles.serviceDescription}>{service.description}</Text>
-        </View>
+  const fetchServiceDetail = useCallback(async (serviceId: string) => {
+    setIsDetailLoading(true);
+    setDetailError(null);
+    try {
+      const data = await getService(serviceId);
+      setSelectedService(data);
+    } catch (err) {
+      setDetailError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not load this service. Please check your connection and try again.',
+      );
+    } finally {
+      setIsDetailLoading(false);
+    }
+  }, []);
+
+  const openService = (serviceId: string) => {
+    setSelectedServiceId(serviceId);
+    setSelectedService(null);
+    fetchServiceDetail(serviceId);
+  };
+
+  const closeService = () => {
+    setSelectedServiceId(null);
+    setSelectedService(null);
+    setDetailError(null);
+  };
+
+  const renderServiceCard = (service: ApiServiceSummary) => (
+    <TouchableOpacity
+      key={service.id}
+      style={styles.serviceCard}
+      onPress={() => openService(service.id)}
+    >
+      <View style={styles.serviceIconContainer}>
+        <Ionicons
+          name={CATEGORY_ICONS[service.category] ?? 'medical-outline'}
+          size={28}
+          color={colors.accent}
+        />
       </View>
-
-      <View style={styles.serviceDetails}>
-        <View style={styles.detailItem}>
-          <Ionicons name="time-outline" size={16} color={colors.secondary} />
-          <Text style={styles.detailText}>{formatDuration(service.durationMinutes)}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="card-outline" size={16} color={colors.secondary} />
-          <Text style={styles.detailText}>{formatPrice(service.price, service.currency)}</Text>
-        </View>
-      </View>
-
-      {service.formats.length > 0 && (
-        <View style={styles.formatsContainer}>
-          {service.formats.map((format) => (
-            <View key={format} style={styles.formatBadge}>
-              <Text style={styles.formatBadgeText}>{formatFormat(format)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={styles.featuresContainer}>
-        {service.features.map((feature, index) => (
-          <View key={index} style={styles.featureItem}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
-            <Text style={styles.featureText}>{feature}</Text>
-          </View>
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.bookButton}>
-        <Text style={styles.bookButtonText}>Book Session</Text>
-      </TouchableOpacity>
-    </View>
+      <Text style={styles.serviceTitle}>{service.name}</Text>
+      <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
+    </TouchableOpacity>
   );
 
   const renderServicesContent = () => {
@@ -145,8 +148,106 @@ const ServicesScreen = () => {
       );
     }
 
-    return services.map(renderService);
+    return services.map(renderServiceCard);
   };
+
+  const renderDetailContent = () => {
+    if (isDetailLoading) {
+      return (
+        <View style={styles.stateContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      );
+    }
+
+    if (detailError) {
+      return (
+        <View style={styles.stateContainer}>
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textLight} />
+          <Text style={styles.stateText}>{detailError}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => selectedServiceId && fetchServiceDetail(selectedServiceId)}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (!selectedService) {
+      return null;
+    }
+
+    return (
+      <View style={styles.detailCard}>
+        <View style={styles.serviceHeader}>
+          <View style={styles.serviceIconContainer}>
+            <Ionicons
+              name={CATEGORY_ICONS[selectedService.category] ?? 'medical-outline'}
+              size={28}
+              color={colors.accent}
+            />
+          </View>
+          <View style={styles.serviceInfo}>
+            <Text style={styles.serviceTitle}>{selectedService.name}</Text>
+            <Text style={styles.serviceDescription}>{selectedService.description}</Text>
+          </View>
+        </View>
+
+        <View style={styles.serviceDetails}>
+          <View style={styles.detailItem}>
+            <Ionicons name="time-outline" size={16} color={colors.secondary} />
+            <Text style={styles.detailText}>{formatDuration(selectedService.durationMinutes)}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="card-outline" size={16} color={colors.secondary} />
+            <Text style={styles.detailText}>
+              {formatPrice(selectedService.price, selectedService.currency)}
+            </Text>
+          </View>
+        </View>
+
+        {selectedService.formats.length > 0 && (
+          <View style={styles.formatsContainer}>
+            {selectedService.formats.map((format) => (
+              <View key={format} style={styles.formatBadge}>
+                <Text style={styles.formatBadgeText}>{formatFormat(format)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.featuresContainer}>
+          {selectedService.features.map((feature, index) => (
+            <View key={index} style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+              <Text style={styles.featureText}>{feature}</Text>
+            </View>
+          ))}
+        </View>
+
+        <TouchableOpacity style={styles.bookButton}>
+          <Text style={styles.bookButtonText}>Book Session</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  if (selectedServiceId) {
+    return (
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.detailHeader}>
+          <TouchableOpacity onPress={closeService} hitSlop={10}>
+            <Ionicons name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.detailHeaderTitle}>{selectedService?.name ?? 'Service'}</Text>
+        </View>
+
+        <View style={styles.servicesContainer}>{renderDetailContent()}</View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -204,6 +305,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  detailHeader: {
+    backgroundColor: colors.secondary,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  detailHeaderTitle: {
+    fontSize: 20,
+    fontFamily: fonts.josefinSans.bold,
+    color: colors.white,
+  },
   servicesContainer: {
     padding: spacing.lg,
   },
@@ -230,10 +344,26 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   serviceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.lg,
+    gap: spacing.md,
+    shadowColor: colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  detailCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
@@ -254,22 +384,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
   serviceInfo: {
     flex: 1,
+    marginLeft: spacing.md,
   },
   serviceTitle: {
     fontSize: 18,
     fontFamily: fonts.josefinSans.bold,
     color: colors.text,
-    marginBottom: spacing.xs,
+    flex: 1,
   },
   serviceDescription: {
     fontSize: 14,
     fontFamily: fonts.arimo.regular,
     color: colors.textLight,
     lineHeight: 20,
+    marginTop: spacing.xs,
   },
   serviceDetails: {
     flexDirection: 'row',

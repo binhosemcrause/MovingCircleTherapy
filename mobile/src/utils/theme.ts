@@ -10,6 +10,14 @@ export const colors = {
   lightGray: '#F5F5F5',
 } as const;
 
+export const circleColors = {
+  orange: '#F2A477',
+  purple: '#CDC1E5',
+  yellow: '#F6E385',
+  blue: '#8DB4D6',
+  green: '#9FC2AF',
+} as const;
+
 export const fonts = {
   josefinSans: {
     regular: 'JosefinSans-Regular',

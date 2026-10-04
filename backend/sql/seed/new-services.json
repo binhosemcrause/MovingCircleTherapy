@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Dance Movement Therapy",
+    "category": "dance_movement_therapy",
+    "description": "Dance Movement Therapy is the therapeutic use of dance and movement to support physical, social, emotional, cognitive and cultural wellbeing. Dance Movement Therapy supports emotional expression, self-discovery and understanding change in a safe, supportive space.",
+    "durationMinutes": { "min": 50, "max": 60 },
+    "price": 120,
+    "currency": "AUD",
+    "formats": ["in_person", "virtual"],
+    "features": [
+      "Personalized treatment plan",
+      "Flexible scheduling",
+      "In-person or virtual"
+    ]
+  },
+  {
+    "name": "Couple Movement Therapy",
+    "category": "couple_movement_therapy",
+    "description": "Couple Movement Therapy is a gentle, experiential approach that uses movement and creative expression to help couples explore their relationship. It can support couples who are experiencing communication difficulties, emotional disconnection, recurring conflict or changes in their relationship and better understand their partner's needs, emotions and perspectives.",
+    "durationMinutes": { "min": 50, "max": 60 },
+    "price": 120,
+    "currency": "AUD",
+    "formats": ["in_person", "virtual"],
+    "features": [
+      "Personalized treatment plan",
+      "Flexible scheduling",
+      "In-person or virtual"
+    ]
+  },
+  {
+    "name": "Family Creative Arts Therapy",
+    "category": "family_therapy",
+    "description": "Family Creative Arts Therapy uses art, movement and play to support communication, emotional expression and stronger family relationships. This service supports families experiencing communication difficulties, conflict, life transitions, changes in family dynamics, emotional challenges, or simply wanting to strengthen their connection.",
+    "durationMinutes": { "min": 50, "max": 60 },
+    "price": 120,
+    "currency": "AUD",
+    "formats": ["in_person", "virtual"],
+    "features": [
+      "Personalized treatment plan",
+      "Flexible scheduling",
+      "In-person or virtual"
+    ]
+  }
+]

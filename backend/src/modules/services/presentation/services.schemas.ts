@@ -19,6 +19,24 @@ export const createServiceSchema = z.object({
   features: z.array(z.string()).optional(),
 });
 
+export const updateServiceSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    category: z.enum(SERVICE_CATEGORIES).optional(),
+    description: z.string().optional(),
+    durationMinutes: z
+      .object({
+        min: z.number().int().positive(),
+        max: z.number().int().positive(),
+      })
+      .optional(),
+    price: z.number().nonnegative().optional(),
+    currency: z.string().length(3).optional(),
+    formats: z.array(z.enum(SESSION_FORMATS)).min(1).optional(),
+    features: z.array(z.string()).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: 'At least one field must be provided.' });
+
 export const serviceIdParamsSchema = z.object({
   serviceId: z.string().uuid(),
 });

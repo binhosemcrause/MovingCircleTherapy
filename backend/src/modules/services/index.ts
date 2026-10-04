@@ -1,9 +1,11 @@
 import type { Router, RequestHandler } from 'express';
 import type { Pool } from 'pg';
 import { CreateServiceUseCase } from './application/CreateServiceUseCase';
+import { DeleteServiceUseCase } from './application/DeleteServiceUseCase';
 import { GetServiceUseCase } from './application/GetServiceUseCase';
 import { ListAvailabilityUseCase } from './application/ListAvailabilityUseCase';
 import { ListServicesUseCase } from './application/ListServicesUseCase';
+import { UpdateServiceUseCase } from './application/UpdateServiceUseCase';
 import { PgAvailabilityRepository } from './infrastructure/PgAvailabilityRepository';
 import { PgServiceRepository } from './infrastructure/PgServiceRepository';
 import { ServicesController } from './presentation/ServicesController';
@@ -26,6 +28,8 @@ export function createServicesModule(pool: Pool, authMiddleware: RequestHandler)
     getServiceUseCase,
     new ListAvailabilityUseCase(serviceRepository, availabilityRepository),
     new CreateServiceUseCase(serviceRepository),
+    new UpdateServiceUseCase(serviceRepository),
+    new DeleteServiceUseCase(serviceRepository),
   );
 
   return {

@@ -4,6 +4,7 @@ export const SERVICE_CATEGORIES = [
   'therapeutic_workshops',
   'family_therapy',
   'couple_movement_therapy',
+  'dance_movement_therapy',
   'creative_arts_classes',
 ] as const;
 export type ServiceCategory = (typeof SERVICE_CATEGORIES)[number];

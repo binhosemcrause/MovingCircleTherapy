@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { env } from './config/env';
 import { createAppointmentsModule } from './modules/appointments';
 import { createAuthModule } from './modules/auth';
+import { createDocsModule } from './modules/docs';
 import { createEnquiriesModule } from './modules/enquiries';
 import { createProfileModule } from './modules/profile';
 import { createResourcesModule } from './modules/resources';
@@ -44,6 +45,7 @@ export function createApp(): Express {
   router.use(createEnquiriesModule(pool));
 
   app.use('/v1', router);
+  app.use(createDocsModule());
   app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
 
   app.use(notFoundHandler);

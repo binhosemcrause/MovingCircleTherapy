@@ -139,7 +139,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Service'
+                  $ref: '#/components/schemas/ServiceSummary'
     post:
       tags: [Services]
       summary: Create a new therapy service
@@ -177,6 +177,44 @@ paths:
                 $ref: '#/components/schemas/Service'
         '404':
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Services]
+      summary: Update a therapy service
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateServiceRequest'
+      responses:
+        '200':
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Services]
+      summary: Delete a therapy service
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '204':
+          description: Service deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   # --------------------------------------------------------- Appointments
   /appointments:
@@ -459,6 +497,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Request conflicts with the current state of the resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
 
   schemas:
     # ---- Enums
@@ -470,6 +514,7 @@ components:
         - therapeutic_workshops
         - family_therapy
         - couple_movement_therapy
+        - dance_movement_therapy
         - creative_arts_classes
 
     AppointmentStatus:
@@ -564,6 +609,19 @@ components:
           type: string
 
     # ---- Services
+    ServiceSummary:
+      type: object
+      description: Lightweight service listing. Fetch GET /services/{serviceId} for full details.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Counselling
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+
     Service:
       type: object
       properties:
@@ -637,6 +695,49 @@ components:
           type: string
           example: USD
           default: USD
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionFormat'
+          minItems: 1
+        features:
+          type: array
+          items:
+            type: string
+          example:
+            - Personalized treatment plan
+            - Flexible scheduling
+            - In-person or virtual
+
+    UpdateServiceRequest:
+      type: object
+      description: All fields are optional; only the provided fields are changed. At least one must be present.
+      properties:
+        name:
+          type: string
+          example: Counselling
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        description:
+          type: string
+          example: One-on-one sessions tailored to your specific needs and goals.
+        durationMinutes:
+          type: object
+          required: [min, max]
+          properties:
+            min:
+              type: integer
+              example: 50
+            max:
+              type: integer
+              example: 60
+        price:
+          type: number
+          format: float
+          example: 120.00
+        currency:
+          type: string
+          example: USD
         formats:
           type: array
           items:

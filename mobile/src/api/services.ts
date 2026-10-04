@@ -1,9 +1,12 @@
 import { apiFetch } from './client';
 
-export interface ApiService {
+export interface ApiServiceSummary {
   id: string;
   name: string;
   category: string;
+}
+
+export interface ApiService extends ApiServiceSummary {
   description: string;
   durationMinutes: { min: number; max: number };
   price: number;
@@ -12,6 +15,10 @@ export interface ApiService {
   features: string[];
 }
 
-export function listServices(): Promise<ApiService[]> {
-  return apiFetch<ApiService[]>('/services');
+export function listServices(): Promise<ApiServiceSummary[]> {
+  return apiFetch<ApiServiceSummary[]>('/services');
+}
+
+export function getService(serviceId: string): Promise<ApiService> {
+  return apiFetch<ApiService>(`/services/${serviceId}`);
 }

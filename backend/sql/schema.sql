@@ -15,6 +15,7 @@ create type service_category as enum (
   'therapeutic_workshops',
   'family_therapy',
   'couple_movement_therapy',
+  'dance_movement_therapy',
   'creative_arts_classes'
 );
 

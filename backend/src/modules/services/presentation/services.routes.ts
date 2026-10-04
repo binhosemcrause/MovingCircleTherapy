@@ -7,6 +7,7 @@ import {
   createServiceSchema,
   listServicesQuerySchema,
   serviceIdParamsSchema,
+  updateServiceSchema,
 } from './services.schemas';
 
 export function createServicesRoutes(controller: ServicesController, authMiddleware: RequestHandler): Router {
@@ -28,6 +29,18 @@ export function createServicesRoutes(controller: ServicesController, authMiddlew
     '/services/:serviceId/availability',
     validate({ params: serviceIdParamsSchema, query: availabilityQuerySchema }),
     asyncHandler(controller.listAvailability),
+  );
+  router.patch(
+    '/services/:serviceId',
+    authMiddleware,
+    validate({ params: serviceIdParamsSchema, body: updateServiceSchema }),
+    asyncHandler(controller.updateService),
+  );
+  router.delete(
+    '/services/:serviceId',
+    authMiddleware,
+    validate({ params: serviceIdParamsSchema }),
+    asyncHandler(controller.deleteService),
   );
 
   return router;

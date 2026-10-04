@@ -1,5 +1,11 @@
 import type { ServiceCategory, SessionFormat } from '../../../shared/domain/enums';
 
+export interface ServiceSummary {
+  id: string;
+  name: string;
+  category: ServiceCategory;
+}
+
 export interface Service {
   id: string;
   name: string;

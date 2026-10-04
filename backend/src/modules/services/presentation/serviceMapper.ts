@@ -1,4 +1,12 @@
-import type { Service } from '../domain/Service';
+import type { Service, ServiceSummary } from '../domain/Service';
+
+export function toServiceSummaryResponse(service: ServiceSummary) {
+  return {
+    id: service.id,
+    name: service.name,
+    category: service.category,
+  };
+}
 
 export function toServiceResponse(service: Service) {
   return {
