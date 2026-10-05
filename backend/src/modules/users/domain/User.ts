@@ -5,6 +5,9 @@ export interface User {
   email: string;
   passwordHash: string;
   phone: string | null;
+  location: string | null;
+  tagline: string | null;
+  avatarUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,6 +18,9 @@ export interface PublicUser {
   lastName: string;
   email: string;
   phone: string | null;
+  location: string | null;
+  tagline: string | null;
+  avatarUrl: string | null;
   createdAt: string;
 }
 
@@ -25,6 +31,9 @@ export function toPublicUser(user: User): PublicUser {
     lastName: user.lastName,
     email: user.email,
     phone: user.phone,
+    location: user.location,
+    tagline: user.tagline,
+    avatarUrl: user.avatarUrl,
     createdAt: user.createdAt.toISOString(),
   };
 }

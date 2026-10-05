@@ -56,6 +56,9 @@ create table users (
   email          citext not null,
   password_hash  text not null,
   phone          text,
+  location       text,
+  tagline        text,
+  avatar_url     text,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );

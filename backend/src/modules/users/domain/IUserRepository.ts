@@ -12,6 +12,9 @@ export interface UpdateUserInput {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  location?: string;
+  tagline?: string;
+  avatarUrl?: string;
 }
 
 export interface IUserRepository {

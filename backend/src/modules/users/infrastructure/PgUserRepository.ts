@@ -9,6 +9,9 @@ interface UserRow {
   email: string;
   password_hash: string;
   phone: string | null;
+  location: string | null;
+  tagline: string | null;
+  avatar_url: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -21,6 +24,9 @@ function toUser(row: UserRow): User {
     email: row.email,
     passwordHash: row.password_hash,
     phone: row.phone,
+    location: row.location,
+    tagline: row.tagline,
+    avatarUrl: row.avatar_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -54,10 +60,21 @@ export class PgUserRepository implements IUserRepository {
       `update users
        set first_name = coalesce($2, first_name),
            last_name = coalesce($3, last_name),
-           phone = coalesce($4, phone)
+           phone = coalesce($4, phone),
+           location = coalesce($5, location),
+           tagline = coalesce($6, tagline),
+           avatar_url = coalesce($7, avatar_url)
        where id = $1
        returning *`,
-      [id, input.firstName ?? null, input.lastName ?? null, input.phone ?? null],
+      [
+        id,
+        input.firstName ?? null,
+        input.lastName ?? null,
+        input.phone ?? null,
+        input.location ?? null,
+        input.tagline ?? null,
+        input.avatarUrl ?? null,
+      ],
     );
     return toUser(result.rows[0]!);
   }

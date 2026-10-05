@@ -594,6 +594,17 @@ components:
           format: email
         phone:
           type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        tagline:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -607,6 +618,13 @@ components:
           type: string
         phone:
           type: string
+        location:
+          type: string
+        tagline:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
 
     # ---- Services
     ServiceSummary:
