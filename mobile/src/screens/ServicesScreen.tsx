@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,40 +6,69 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { circleColors, circleTextColors, colors, fonts, spacing, borderRadius } from '../utils/theme';
 import { ApiError } from '../api/client';
 import { ApiService, ApiServiceSummary, getService, listServices } from '../api/services';
+import { RootTabParamList } from '../navigation/types';
 
-type IoniconName = keyof typeof Ionicons.glyphMap;
+type Props = BottomTabScreenProps<RootTabParamList, 'Services'>;
 
-const CATEGORY_ICONS: Record<string, IoniconName> = {
-  counselling: 'person-outline',
-  creative_arts_therapy: 'color-palette-outline',
-  therapeutic_workshops: 'people-circle-outline',
-  family_therapy: 'home-outline',
-  couple_movement_therapy: 'body-outline',
-  dance_movement_therapy: 'walk-outline',
-  creative_arts_classes: 'brush-outline',
+// Each service category gets the same pastel + text-color pairing as the
+// home screen's circle cluster (circleColors / circleTextColors in
+// theme.ts), plus a paler tint — `light` — of the same hue for the
+// secondary "Explore" button. Categories without an explicit entry fall
+// back to a deterministic pick from the same palette, so a newly added
+// category still looks intentional.
+const CATEGORY_THEME: Record<string, { background: string; light: string; text: string }> = {
+  creative_arts_therapy: { background: circleColors.orange, light: '#F8CDAE', text: circleTextColors.orange },
+  counselling: { background: circleColors.green, light: '#CBE0D3', text: circleTextColors.green },
+  family_therapy: { background: circleColors.blue, light: '#BFDAEC', text: circleTextColors.blue },
+  dance_movement_therapy: { background: circleColors.yellow, light: '#FAEFBB', text: circleTextColors.yellow },
+  couple_movement_therapy: { background: circleColors.purple, light: '#E4DEF1', text: circleTextColors.purple },
 };
 
-const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£' };
+const FALLBACK_THEMES = Object.values(CATEGORY_THEME);
 
-function formatDuration({ min, max }: ApiService['durationMinutes']): string {
-  return min === max ? `${min} minutes` : `${min}-${max} minutes`;
+function getCategoryTheme(category: string): { background: string; light: string; text: string } {
+  const theme = CATEGORY_THEME[category];
+  if (theme) {
+    return theme;
+  }
+  const hash = Array.from(category).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return FALLBACK_THEMES[hash % FALLBACK_THEMES.length]!;
 }
 
-function formatPrice(price: number, currency: string): string {
-  const symbol = CURRENCY_SYMBOLS[currency];
-  return symbol ? `${symbol}${price}/session` : `${price} ${currency}/session`;
+// Rough card height from the name's word count, used for each card's
+// minHeight so the staggered grid doesn't look perfectly uniform.
+function estimateCardHeight(name: string): number {
+  const words = name.trim().split(/\s+/).length;
+  return 130 + Math.min(words, 4) * 30;
 }
 
-function formatFormat(format: 'in_person' | 'virtual'): string {
-  return format === 'in_person' ? 'In person' : 'Virtual';
+// Fixed 2-left/3-right split: the right column takes every other item
+// starting from the first, so it ends up with the extra one whenever the
+// list length is odd (5 services -> 2 left, 3 right).
+function splitIntoColumns<T>(items: T[]): [T[], T[]] {
+  const left: T[] = [];
+  const right: T[] = [];
+
+  items.forEach((item, index) => {
+    (index % 2 === 0 ? right : left).push(item);
+  });
+
+  return [left, right];
 }
 
-const ServicesScreen = () => {
+const ServicesScreen = ({ navigation }: Props) => {
+  // Neither screen tab has a native header (headerShown: false in App.tsx),
+  // so the back buttons below have to clear the status bar / notch
+  // themselves rather than relying on a navigation header to do it.
+  const insets = useSafeAreaInsets();
   const [services, setServices] = useState<ApiServiceSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,23 +130,23 @@ const ServicesScreen = () => {
     setDetailError(null);
   };
 
-  const renderServiceCard = (service: ApiServiceSummary) => (
-    <TouchableOpacity
-      key={service.id}
-      style={styles.serviceCard}
-      onPress={() => openService(service.id)}
-    >
-      <View style={styles.serviceIconContainer}>
-        <Ionicons
-          name={CATEGORY_ICONS[service.category] ?? 'medical-outline'}
-          size={28}
-          color={colors.accent}
-        />
-      </View>
-      <Text style={styles.serviceTitle}>{service.name}</Text>
-      <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
-    </TouchableOpacity>
-  );
+  const [leftColumn, rightColumn] = useMemo(() => splitIntoColumns(services), [services]);
+
+  const renderServiceCard = (service: ApiServiceSummary) => {
+    const theme = getCategoryTheme(service.category);
+    return (
+      <TouchableOpacity
+        key={service.id}
+        style={[
+          styles.serviceCard,
+          { backgroundColor: theme.background, minHeight: estimateCardHeight(service.name) },
+        ]}
+        onPress={() => openService(service.id)}
+      >
+        <Text style={[styles.serviceCardLabel, { color: theme.text }]}>{service.name}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderServicesContent = () => {
     if (isLoading) {
@@ -148,7 +177,12 @@ const ServicesScreen = () => {
       );
     }
 
-    return services.map(renderServiceCard);
+    return (
+      <View style={styles.grid}>
+        <View style={styles.column}>{leftColumn.map(renderServiceCard)}</View>
+        <View style={styles.column}>{rightColumn.map(renderServiceCard)}</View>
+      </View>
+    );
   };
 
   const renderDetailContent = () => {
@@ -179,56 +213,23 @@ const ServicesScreen = () => {
       return null;
     }
 
+    const theme = getCategoryTheme(selectedService.category);
+
     return (
-      <View style={styles.detailCard}>
-        <View style={styles.serviceHeader}>
-          <View style={styles.serviceIconContainer}>
-            <Ionicons
-              name={CATEGORY_ICONS[selectedService.category] ?? 'medical-outline'}
-              size={28}
-              color={colors.accent}
-            />
-          </View>
-          <View style={styles.serviceInfo}>
-            <Text style={styles.serviceTitle}>{selectedService.name}</Text>
-            <Text style={styles.serviceDescription}>{selectedService.description}</Text>
-          </View>
-        </View>
+      <View style={styles.detailBody}>
+        <Text style={[styles.detailTitle, { color: theme.text }]}>{selectedService.name}</Text>
+        {/* Every service is offered in all three modalities, so this line is
+            fixed copy rather than something read off the API response. */}
+        <Text style={styles.detailSubtitle}>Individual · Couples · Family</Text>
+        <Text style={styles.detailDescription}>{selectedService.description}</Text>
 
-        <View style={styles.serviceDetails}>
-          <View style={styles.detailItem}>
-            <Ionicons name="time-outline" size={16} color={colors.secondary} />
-            <Text style={styles.detailText}>{formatDuration(selectedService.durationMinutes)}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Ionicons name="card-outline" size={16} color={colors.secondary} />
-            <Text style={styles.detailText}>
-              {formatPrice(selectedService.price, selectedService.currency)}
-            </Text>
-          </View>
-        </View>
-
-        {selectedService.formats.length > 0 && (
-          <View style={styles.formatsContainer}>
-            {selectedService.formats.map((format) => (
-              <View key={format} style={styles.formatBadge}>
-                <Text style={styles.formatBadgeText}>{formatFormat(format)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <View style={styles.featuresContainer}>
-          {selectedService.features.map((feature, index) => (
-            <View key={index} style={styles.featureItem}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
-        </View>
-
-        <TouchableOpacity style={styles.bookButton}>
-          <Text style={styles.bookButtonText}>Book Session</Text>
+        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.background }]}>
+          <Text style={[styles.primaryButtonText, { color: theme.text }]}>Book a session</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: theme.light }]}>
+          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>
+            Explore a self guided activity
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -237,11 +238,15 @@ const ServicesScreen = () => {
   if (selectedServiceId) {
     return (
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.detailHeader}>
-          <TouchableOpacity onPress={closeService} hitSlop={10}>
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
+        <View style={[styles.heroContainer, { marginTop: insets.top + spacing.md }]}>
+          {selectedService?.imageUrl ? (
+            <Image source={{ uri: selectedService.imageUrl }} style={styles.heroImage} />
+          ) : (
+            <View style={[styles.heroImage, styles.heroPlaceholder]} />
+          )}
+          <TouchableOpacity style={styles.backButton} onPress={closeService} hitSlop={10}>
+            <Ionicons name="arrow-back" size={20} color={colors.white} />
           </TouchableOpacity>
-          <Text style={styles.detailHeaderTitle}>{selectedService?.name ?? 'Service'}</Text>
         </View>
 
         <View style={styles.servicesContainer}>{renderDetailContent()}</View>
@@ -251,31 +256,18 @@ const ServicesScreen = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Our Services</Text>
-        <Text style={styles.headerSubtitle}>
-          Comprehensive mental health services tailored to your needs
-        </Text>
+      <View style={[styles.listHeader, { paddingTop: insets.top + spacing.md }]}>
+        <TouchableOpacity
+          style={styles.listBackButton}
+          onPress={() => navigation.navigate('Home')}
+          hitSlop={10}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.white} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.servicesContainer}>
         {renderServicesContent()}
-      </View>
-
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>Insurance & Payment</Text>
-        <Text style={styles.infoText}>
-          We accept most major insurance plans and offer sliding scale fees for those in need.
-          Contact us to discuss payment options and insurance coverage.
-        </Text>
-
-        <View style={styles.contactInfo}>
-          <Text style={styles.contactTitle}>Questions about services?</Text>
-          <TouchableOpacity style={styles.contactButton}>
-            <Ionicons name="call-outline" size={20} color={colors.white} />
-            <Text style={styles.contactButtonText}>Call Us</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </ScrollView>
   );
@@ -286,37 +278,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primary,
   },
-  header: {
+  listHeader: {
+    paddingHorizontal: spacing.lg,
+  },
+  listBackButton: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.round,
     backgroundColor: colors.secondary,
-    padding: spacing.xl,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontFamily: fonts.josefinSans.bold,
-    color: colors.white,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
+  heroContainer: {
+    width: '100%',
+    height: 220,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    fontFamily: fonts.arimo.regular,
-    color: colors.white,
-    textAlign: 'center',
-    lineHeight: 22,
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
-  detailHeader: {
-    backgroundColor: colors.secondary,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    flexDirection: 'row',
+  heroPlaceholder: {
+    backgroundColor: colors.lightGray,
+  },
+  backButton: {
+    position: 'absolute',
+    top: spacing.lg,
+    left: spacing.lg,
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.round,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.md,
-  },
-  detailHeaderTitle: {
-    fontSize: 20,
-    fontFamily: fonts.josefinSans.bold,
-    color: colors.white,
   },
   servicesContainer: {
     padding: spacing.lg,
@@ -343,166 +336,64 @@ const styles = StyleSheet.create({
     fontFamily: fonts.garet.bold,
     color: colors.white,
   },
-  serviceCard: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
     gap: spacing.md,
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  detailCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  column: {
+    flex: 1,
+    gap: spacing.md,
   },
-  serviceHeader: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-  },
-  serviceIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: borderRadius.round,
-    backgroundColor: colors.lightGray,
+  serviceCard: {
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: borderRadius.xxl,
+    paddingHorizontal: spacing.md,
   },
-  serviceInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  serviceTitle: {
-    fontSize: 18,
+  serviceCardLabel: {
+    fontSize: 16,
     fontFamily: fonts.josefinSans.bold,
-    color: colors.text,
-    flex: 1,
+    textAlign: 'center',
   },
-  serviceDescription: {
+  detailBody: {
+    paddingTop: spacing.sm,
+  },
+  detailTitle: {
+    fontSize: 22,
+    fontFamily: fonts.josefinSans.bold,
+  },
+  detailSubtitle: {
     fontSize: 14,
     fontFamily: fonts.arimo.regular,
     color: colors.textLight,
-    lineHeight: 20,
     marginTop: spacing.xs,
   },
-  serviceDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  detailText: {
-    fontSize: 14,
-    fontFamily: fonts.garet.medium,
-    color: colors.text,
-  },
-  formatsContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  formatBadge: {
-    backgroundColor: colors.lightGray,
-    borderRadius: borderRadius.round,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  formatBadgeText: {
-    fontSize: 12,
-    fontFamily: fonts.garet.medium,
-    color: colors.textLight,
-  },
-  featuresContainer: {
-    marginBottom: spacing.md,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  featureText: {
-    fontSize: 14,
+  detailDescription: {
+    fontSize: 15,
     fontFamily: fonts.arimo.regular,
     color: colors.text,
-  },
-  bookButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  bookButtonText: {
-    fontSize: 16,
-    fontFamily: fonts.garet.bold,
-    color: colors.white,
-  },
-  infoSection: {
-    padding: spacing.lg,
-    backgroundColor: colors.lightGray,
-  },
-  infoTitle: {
-    fontSize: 20,
-    fontFamily: fonts.josefinSans.bold,
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  infoText: {
-    fontSize: 16,
-    fontFamily: fonts.arimo.regular,
-    color: colors.text,
-    lineHeight: 24,
+    lineHeight: 22,
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  contactInfo: {
+  primaryButton: {
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.round,
     alignItems: 'center',
-  },
-  contactTitle: {
-    fontSize: 18,
-    fontFamily: fonts.garet.medium,
-    color: colors.text,
     marginBottom: spacing.md,
   },
-  contactButton: {
-    backgroundColor: colors.secondary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    gap: spacing.sm,
-  },
-  contactButtonText: {
+  primaryButtonText: {
     fontSize: 16,
     fontFamily: fonts.garet.bold,
-    color: colors.white,
+  },
+  secondaryButton: {
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.round,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontFamily: fonts.garet.medium,
   },
 });
 

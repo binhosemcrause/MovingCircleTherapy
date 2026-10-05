@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { colors, circleColors, fonts } from '../utils/theme';
+import { colors, circleColors, circleTextColors, fonts } from '../utils/theme';
 import { RootTabParamList } from '../navigation/types';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Home'>;
@@ -10,6 +10,7 @@ interface CircleItem {
   id: number;
   label: string;
   color: string;
+  textColor: string;
   // Position and size as a fraction of the design canvas, keyed to a
   // 656-wide reference so the cluster scales to any screen width while
   // staying circular.
@@ -22,11 +23,11 @@ const DESIGN_WIDTH = 656;
 const DESIGN_HEIGHT = 1258;
 
 const circles: CircleItem[] = [
-  { id: 1, label: 'resources', color: circleColors.orange, left: 285, top: 127, diameter: 375 },
-  { id: 2, label: 'my journey', color: circleColors.purple, left: -15, top: 278, diameter: 290 },
-  { id: 3, label: 'moving within', color: circleColors.yellow, left: 207, top: 505, diameter: 305 },
-  { id: 4, label: 'creative circle', color: circleColors.blue, left: -75, top: 636, diameter: 340 },
-  { id: 5, label: 'therapy for all', color: circleColors.green, left: 203, top: 785, diameter: 460 },
+  { id: 1, label: 'resources', color: circleColors.orange, textColor: circleTextColors.orange, left: 285, top: 127, diameter: 375 },
+  { id: 2, label: 'my journey', color: circleColors.purple, textColor: circleTextColors.purple, left: -15, top: 278, diameter: 290 },
+  { id: 3, label: 'moving within', color: circleColors.yellow, textColor: circleTextColors.yellow, left: 207, top: 505, diameter: 305 },
+  { id: 4, label: 'creative circle', color: circleColors.blue, textColor: circleTextColors.blue, left: -75, top: 636, diameter: 340 },
+  { id: 5, label: 'therapy for all', color: circleColors.green, textColor: circleTextColors.green, left: 203, top: 785, diameter: 460 },
 ];
 
 const HomeScreen = (_props: Props) => {
@@ -41,8 +42,8 @@ const HomeScreen = (_props: Props) => {
     <View style={styles.container}>
       <View style={[styles.canvas, { width, height: DESIGN_HEIGHT * scale }]}>
         <View style={[styles.titleContainer, { left: 32 * scale, top: 98 * scale }]}>
-          <Text style={[styles.titleLine, { fontSize: 24 * scale }]}>moving circle</Text>
-          <Text style={[styles.titleLineBold, { fontSize: 24 * scale }]}>THERAPY</Text>
+          <Text style={[styles.titleLine, { fontSize: 28 * scale }]}>moving circle</Text>
+          <Text style={[styles.titleLineBold, { fontSize: 28 * scale }]}>THERAPY</Text>
         </View>
 
         {circles.map((item) => {
@@ -63,7 +64,9 @@ const HomeScreen = (_props: Props) => {
               ]}
               onPress={() => handlePress(item)}
             >
-              <Text style={[styles.circleLabel, { fontSize: 20 * scale }]}>{item.label}</Text>
+              <Text style={[styles.circleLabel, { fontSize: 24 * scale, color: item.textColor }]}>
+                {item.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -98,8 +101,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   circleLabel: {
-    fontFamily: fonts.arimo.regular,
-    color: colors.text,
+    fontFamily: fonts.josefinSans.bold,
     textAlign: 'center',
   },
 });

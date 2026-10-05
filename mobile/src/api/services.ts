@@ -13,6 +13,7 @@ export interface ApiService extends ApiServiceSummary {
   currency: string;
   formats: ('in_person' | 'virtual')[];
   features: string[];
+  imageUrl: string | null;
 }
 
 export function listServices(): Promise<ApiServiceSummary[]> {

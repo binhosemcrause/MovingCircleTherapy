@@ -8,6 +8,9 @@ export interface ApiUser {
   lastName: string;
   email: string;
   phone: string | null;
+  location: string | null;
+  tagline: string | null;
+  avatarUrl: string | null;
   createdAt: string;
 }
 

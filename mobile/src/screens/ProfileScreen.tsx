@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,22 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Switch,
+  Image,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { circleColors, circleTextColors, colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { RootTabParamList } from '../navigation/types';
 import { ApiError, ApiUser, loginUser, registerUser } from '../api/auth';
+import { setAccessToken, clearSession } from '../api/session';
+import { ApiAppointment, listAppointments } from '../api/appointments';
+
+type Props = BottomTabScreenProps<RootTabParamList, 'Profile'>;
 
 interface LoginData {
   email: string;
@@ -21,24 +30,46 @@ interface LoginData {
 }
 
 interface RegisterData {
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
   password: string;
   confirmPassword: string;
-  phone: string;
 }
 
 const emptyLoginData: LoginData = { email: '', password: '' };
 
 const emptyRegisterData: RegisterData = {
-  firstName: '',
-  lastName: '',
+  fullName: '',
   email: '',
   password: '',
   confirmPassword: '',
-  phone: '',
 };
+
+// The API models first/last name separately; the design collects one Full
+// Name field, so this splits "Jane Doe" -> firstName "Jane", lastName "Doe"
+// (everything after the first word) right before submitting.
+function splitFullName(fullName: string): { firstName: string; lastName: string } | null {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) {
+    return null;
+  }
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(' ') };
+}
+
+function formatSessionDate(iso: string): { month: string; day: string } {
+  const date = new Date(iso);
+  return {
+    month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+    day: String(date.getDate()),
+  };
+}
+
+function formatSessionTimeRange(iso: string, durationMinutes: number): string {
+  const start = new Date(iso);
+  const end = new Date(start.getTime() + durationMinutes * 60000);
+  const format = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${format(start)} - ${format(end)}`;
+}
 
 function describeApiError(error: unknown): string {
   if (error instanceof ApiError) {
@@ -50,14 +81,42 @@ function describeApiError(error: unknown): string {
   return 'Could not reach the server. Please check your connection and try again.';
 }
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }: Props) => {
+  // Neither state of this tab has a native header (headerShown: false in
+  // App.tsx), so content has to clear the status bar / notch itself.
+  const insets = useSafeAreaInsets();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLoginForm, setShowLoginForm] = useState(false);
+  // No separate "welcome" choice screen: landing on this tab while logged
+  // out goes straight to the login form, matching the design. Registering
+  // is reached via the "Sign Up" link below it.
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [loginData, setLoginData] = useState<LoginData>(emptyLoginData);
   const [registerData, setRegisterData] = useState<RegisterData>(emptyRegisterData);
   const [apiUser, setApiUser] = useState<ApiUser | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [appointments, setAppointments] = useState<ApiAppointment[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
+
+  const fetchAppointments = useCallback(async () => {
+    setIsLoadingAppointments(true);
+    setAppointmentsError(null);
+    try {
+      const data = await listAppointments();
+      setAppointments(data);
+    } catch (err) {
+      setAppointmentsError(describeApiError(err));
+    } finally {
+      setIsLoadingAppointments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchAppointments();
+    }
+  }, [isLoggedIn, fetchAppointments]);
 
   const handleLogin = async () => {
     if (!loginData.email || !loginData.password) {
@@ -68,12 +127,11 @@ const ProfileScreen = () => {
     setIsSubmitting(true);
     try {
       const result = await loginUser({ email: loginData.email, password: loginData.password });
+      setAccessToken(result.accessToken);
       setApiUser(result.user);
       setIsLoggedIn(true);
-      setShowLoginForm(false);
       setShowRegisterForm(false);
       setLoginData(emptyLoginData);
-      Alert.alert('Success', 'Welcome back!');
     } catch (error) {
       Alert.alert('Sign In Failed', describeApiError(error));
     } finally {
@@ -82,9 +140,9 @@ const ProfileScreen = () => {
   };
 
   const handleRegister = async () => {
-    if (!registerData.firstName || !registerData.lastName || !registerData.email ||
-        !registerData.password || !registerData.confirmPassword) {
-      Alert.alert('Missing Information', 'Please fill in all required fields.');
+    const name = splitFullName(registerData.fullName);
+    if (!name || !registerData.email || !registerData.password || !registerData.confirmPassword) {
+      Alert.alert('Missing Information', 'Please enter your full name (first and last), email, and password.');
       return;
     }
 
@@ -96,18 +154,16 @@ const ProfileScreen = () => {
     setIsSubmitting(true);
     try {
       const result = await registerUser({
-        firstName: registerData.firstName,
-        lastName: registerData.lastName,
+        firstName: name.firstName,
+        lastName: name.lastName,
         email: registerData.email,
         password: registerData.password,
-        phone: registerData.phone || undefined,
       });
+      setAccessToken(result.accessToken);
       setApiUser(result.user);
       setIsLoggedIn(true);
-      setShowLoginForm(false);
       setShowRegisterForm(false);
       setRegisterData(emptyRegisterData);
-      Alert.alert('Success', 'Account created successfully!');
     } catch (error) {
       Alert.alert('Registration Failed', describeApiError(error));
     } finally {
@@ -124,8 +180,11 @@ const ProfileScreen = () => {
         {
           text: 'Logout',
           onPress: () => {
+            clearSession();
             setIsLoggedIn(false);
             setApiUser(null);
+            setAppointments([]);
+            setShowRegisterForm(false);
             setLoginData(emptyLoginData);
             setRegisterData(emptyRegisterData);
           }
@@ -134,328 +193,292 @@ const ProfileScreen = () => {
     );
   };
 
-  const renderLoginForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.formTitle}>Sign In</Text>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Email Address</Text>
-        <TextInput
-          style={styles.textInput}
-          value={loginData.email}
-          onChangeText={(text) => setLoginData({ ...loginData, email: text })}
-          placeholder="Enter your email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Password</Text>
-        <TextInput
-          style={styles.textInput}
-          value={loginData.password}
-          onChangeText={(text) => setLoginData({ ...loginData, password: text })}
-          placeholder="Enter your password"
-          secureTextEntry
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-        onPress={handleLogin}
-        disabled={isSubmitting}
+  const renderLoginScreen = () => (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={styles.loginScreen}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.submitButtonText}>{isSubmitting ? 'Signing In…' : 'Sign In'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.linkButton}
-        onPress={() => {
-          setShowLoginForm(false);
-          setShowRegisterForm(true);
-        }}
-      >
-        <Text style={styles.linkText}>Don't have an account? Register</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderRegisterForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.formTitle}>Create Account</Text>
-
-      <View style={styles.row}>
-        <View style={[styles.inputGroup, { flex: 1, marginRight: spacing.sm }]}>
-          <Text style={styles.inputLabel}>First Name *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={registerData.firstName}
-            onChangeText={(text) => setRegisterData({ ...registerData, firstName: text })}
-            placeholder="First name"
-          />
+        <View style={[styles.loginTitleContainer, { paddingTop: insets.top + spacing.xl }]}>
+          <Text style={styles.loginTitleLine}>moving circle</Text>
+          <Text style={styles.loginTitleLineBold}>THERAPY</Text>
         </View>
 
-        <View style={[styles.inputGroup, { flex: 1, marginLeft: spacing.sm }]}>
-          <Text style={styles.inputLabel}>Last Name *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={registerData.lastName}
-            onChangeText={(text) => setRegisterData({ ...registerData, lastName: text })}
-            placeholder="Last name"
-          />
+        <View style={styles.loginFields}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={styles.textInput}
+              value={loginData.email}
+              onChangeText={(text) => setLoginData({ ...loginData, email: text })}
+              placeholder="abc@email.com"
+              placeholderTextColor={colors.textLight}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput
+              style={styles.textInput}
+              value={loginData.password}
+              onChangeText={(text) => setLoginData({ ...loginData, password: text })}
+              placeholder="Enter password"
+              placeholderTextColor={colors.textLight}
+              secureTextEntry
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.loginButton, isSubmitting && styles.submitButtonDisabled]}
+            onPress={handleLogin}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.loginButtonText}>{isSubmitting ? 'Logging in…' : 'Login'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.loginSpacer} />
+
+        <View style={styles.signUpRow}>
+          <Text style={styles.signUpText}>Don't have an account? </Text>
+          <TouchableOpacity onPress={() => setShowRegisterForm(true)}>
+            <Text style={styles.signUpLink}>Sign Up</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+
+  const renderRegisterScreen = () => (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView
+        contentContainerStyle={styles.loginScreen}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.loginTitleContainer, { paddingTop: insets.top + spacing.xl }]}>
+          <Text style={styles.loginTitleLine}>moving circle</Text>
+          <Text style={styles.loginTitleLineBold}>THERAPY</Text>
+        </View>
+
+        <View style={styles.registerCard}>
+          <Text style={styles.registerCardTitle}>Create Account</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <View style={styles.iconInputContainer}>
+              <Ionicons name="person-outline" size={18} color={colors.textLight} />
+              <TextInput
+                style={styles.iconTextInput}
+                value={registerData.fullName}
+                onChangeText={(text) => setRegisterData({ ...registerData, fullName: text })}
+                placeholder="Jane Doe"
+                placeholderTextColor={colors.textLight}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <View style={styles.iconInputContainer}>
+              <Ionicons name="mail-outline" size={18} color={colors.textLight} />
+              <TextInput
+                style={styles.iconTextInput}
+                value={registerData.email}
+                onChangeText={(text) => setRegisterData({ ...registerData, email: text })}
+                placeholder="jane@example.com"
+                placeholderTextColor={colors.textLight}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <View style={styles.iconInputContainer}>
+              <Ionicons name="lock-closed-outline" size={18} color={colors.textLight} />
+              <TextInput
+                style={styles.iconTextInput}
+                value={registerData.password}
+                onChangeText={(text) => setRegisterData({ ...registerData, password: text })}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textLight}
+                secureTextEntry
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Confirm Password</Text>
+            <View style={styles.iconInputContainer}>
+              <Ionicons name="refresh-outline" size={18} color={colors.textLight} />
+              <TextInput
+                style={styles.iconTextInput}
+                value={registerData.confirmPassword}
+                onChangeText={(text) => setRegisterData({ ...registerData, confirmPassword: text })}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textLight}
+                secureTextEntry
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.signUpButton, isSubmitting && styles.submitButtonDisabled]}
+            onPress={handleRegister}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.signUpButtonText}>{isSubmitting ? 'Signing Up…' : 'Sign Up'}</Text>
+            {!isSubmitting && <Ionicons name="arrow-forward" size={18} color={colors.text} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.loginLinkRow} onPress={() => setShowRegisterForm(false)}>
+            <Text style={styles.loginLinkText}>Already have an account? Login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+
+  const renderUpcomingSessions = () => {
+    if (isLoadingAppointments) {
+      return (
+        <View style={styles.sessionStateContainer}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      );
+    }
+
+    if (appointmentsError) {
+      return (
+        <View style={styles.sessionStateContainer}>
+          <Text style={styles.sessionStateText}>{appointmentsError}</Text>
+          <TouchableOpacity onPress={fetchAppointments}>
+            <Text style={styles.sessionRetryText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    const now = Date.now();
+    const upcoming = appointments
+      .filter((a) => a.status !== 'cancelled' && new Date(a.scheduledAt).getTime() >= now)
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+    const next = upcoming[0];
+
+    if (!next) {
+      return (
+        <View style={styles.sessionStateContainer}>
+          <Text style={styles.sessionStateText}>No upcoming sessions.</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Services')}>
+            <Text style={styles.sessionRetryText}>Book a session</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    const { month, day } = formatSessionDate(next.scheduledAt);
+    return (
+      <View style={styles.sessionCard}>
+        <View style={styles.sessionDateBadge}>
+          <Text style={styles.sessionDateMonth}>{month}</Text>
+          <Text style={styles.sessionDateDay}>{day}</Text>
+        </View>
+        <View style={styles.sessionDetails}>
+          <Text style={styles.sessionTitle}>{next.service.name}</Text>
+          <View style={styles.sessionTimeRow}>
+            <Ionicons name="time-outline" size={14} color={colors.textLight} />
+            <Text style={styles.sessionTime}>
+              {formatSessionTimeRange(next.scheduledAt, next.service.durationMinutes.max)}
+            </Text>
+          </View>
         </View>
       </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Email Address *</Text>
-        <TextInput
-          style={styles.textInput}
-          value={registerData.email}
-          onChangeText={(text) => setRegisterData({ ...registerData, email: text })}
-          placeholder="Enter your email"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Phone Number</Text>
-        <TextInput
-          style={styles.textInput}
-          value={registerData.phone}
-          onChangeText={(text) => setRegisterData({ ...registerData, phone: text })}
-          placeholder="Enter your phone number"
-          keyboardType="phone-pad"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Password *</Text>
-        <TextInput
-          style={styles.textInput}
-          value={registerData.password}
-          onChangeText={(text) => setRegisterData({ ...registerData, password: text })}
-          placeholder="Create a password"
-          secureTextEntry
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Confirm Password *</Text>
-        <TextInput
-          style={styles.textInput}
-          value={registerData.confirmPassword}
-          onChangeText={(text) => setRegisterData({ ...registerData, confirmPassword: text })}
-          placeholder="Confirm your password"
-          secureTextEntry
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-        onPress={handleRegister}
-        disabled={isSubmitting}
-      >
-        <Text style={styles.submitButtonText}>{isSubmitting ? 'Creating Account…' : 'Create Account'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.linkButton}
-        onPress={() => {
-          setShowRegisterForm(false);
-          setShowLoginForm(true);
-        }}
-      >
-        <Text style={styles.linkText}>Already have an account? Sign In</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const renderUserProfile = () => (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person-circle" size={80} color={colors.white} />
-        </View>
-        <Text style={styles.userName}>{apiUser?.firstName} {apiUser?.lastName}</Text>
-        <Text style={styles.userEmail}>{apiUser?.email}</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingTop: insets.top + spacing.xl, paddingBottom: spacing.xl }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.brandTitleContainer}>
+        <Text style={styles.loginTitleLine}>moving circle</Text>
+        <Text style={styles.loginTitleLineBold}>THERAPY</Text>
       </View>
+
+      <View style={styles.avatarWrapper}>
+        <LinearGradient
+          colors={[colors.accent, circleColors.yellow]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarRing}
+        >
+          <View style={styles.avatarInner}>
+            {apiUser?.avatarUrl ? (
+              <Image source={{ uri: apiUser.avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Ionicons name="person" size={48} color={colors.secondary} />
+            )}
+          </View>
+        </LinearGradient>
+        <TouchableOpacity
+          style={styles.avatarEditBadge}
+          onPress={() => Alert.alert('Coming soon', 'Photo upload is not available yet.')}
+        >
+          <Ionicons name="pencil" size={14} color={colors.white} />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.userName}>{apiUser?.firstName} {apiUser?.lastName}</Text>
+      {!!apiUser?.tagline && <Text style={styles.userTagline}>{apiUser.tagline}</Text>}
 
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{apiUser?.firstName} {apiUser?.lastName}</Text>
-            </View>
+            <Text style={styles.infoLabel}>EMAIL</Text>
+            <Text style={styles.infoValue}>{apiUser?.email}</Text>
           </View>
-
           <View style={styles.infoRow}>
-            <Ionicons name="mail-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{apiUser?.email}</Text>
-            </View>
+            <Text style={styles.infoLabel}>PHONE</Text>
+            <Text style={styles.infoValue}>{apiUser?.phone ?? 'Not provided'}</Text>
           </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Phone</Text>
-              <Text style={styles.infoValue}>{apiUser?.phone ?? 'Not provided'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Date of Birth</Text>
-              <Text style={styles.infoValue}>Not provided</Text>
-            </View>
+          <View style={[styles.infoRow, styles.infoRowLast]}>
+            <Text style={styles.infoLabel}>LOCATION</Text>
+            <Text style={styles.infoValue}>{apiUser?.location ?? 'Not provided'}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.profileSection}>
-        <Text style={styles.sectionTitle}>Emergency Contact</Text>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Contact Name</Text>
-              <Text style={styles.infoValue}>Not provided</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Contact Phone</Text>
-              <Text style={styles.infoValue}>Not provided</Text>
-            </View>
-          </View>
-        </View>
+        <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
+        {renderUpcomingSessions()}
       </View>
 
-      <View style={styles.profileSection}>
-        <Text style={styles.sectionTitle}>Insurance Information</Text>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Ionicons name="medical-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Provider</Text>
-              <Text style={styles.infoValue}>Not provided</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="card-outline" size={20} color={colors.secondary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Policy Number</Text>
-              <Text style={styles.infoValue}>Not provided</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.profileSection}>
-        <Text style={styles.sectionTitle}>Account Settings</Text>
-
-        <View style={styles.settingsCard}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="notifications-outline" size={20} color={colors.secondary} />
-              <Text style={styles.settingLabel}>Push Notifications</Text>
-            </View>
-            <Switch
-              value={true}
-              onValueChange={() => {}}
-              trackColor={{ false: colors.gray, true: colors.accent }}
-              thumbColor={colors.white}
-            />
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="mail-outline" size={20} color={colors.secondary} />
-              <Text style={styles.settingLabel}>Email Notifications</Text>
-            </View>
-            <Switch
-              value={true}
-              onValueChange={() => {}}
-              trackColor={{ false: colors.gray, true: colors.accent }}
-              thumbColor={colors.white}
-            />
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.profileSection}>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color={colors.white} />
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.logoutRow} onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={18} color={circleTextColors.orange} />
+        <Text style={styles.logoutRowText}>Logout</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 
   if (!isLoggedIn) {
-    return (
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <ScrollView
-          contentContainerStyle={styles.loggedOutContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Profile</Text>
-            <Text style={styles.headerSubtitle}>
-              Sign in to access your account and manage your appointments
-            </Text>
-          </View>
-
-          {!showLoginForm && !showRegisterForm ? (
-            <View style={styles.welcomeContainer}>
-              <Ionicons name="person-circle-outline" size={80} color={colors.secondary} />
-              <Text style={styles.welcomeTitle}>Welcome to Moving Circle Therapy</Text>
-              <Text style={styles.welcomeSubtitle}>
-                Create an account or sign in to access your profile, book appointments, and manage your therapy journey.
-              </Text>
-
-              <View style={styles.authButtons}>
-                <TouchableOpacity
-                  style={styles.authButton}
-                  onPress={() => setShowLoginForm(true)}
-                >
-                  <Text style={styles.authButtonText}>Sign In</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.authButton, styles.registerButton]}
-                  onPress={() => setShowRegisterForm(true)}
-                >
-                  <Text style={[styles.authButtonText, { color: colors.accent }]}>Create Account</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : showLoginForm ? (
-            renderLoginForm()
-          ) : (
-            renderRegisterForm()
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    );
+    return showRegisterForm ? renderRegisterScreen() : renderLoginScreen();
   }
 
   return renderUserProfile();
@@ -466,80 +489,59 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primary,
   },
-  loggedOutContent: {
+  loginScreen: {
     flexGrow: 1,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
   },
-  header: {
-    backgroundColor: colors.secondary,
-    padding: spacing.xl,
-    alignItems: 'center',
+  loginTitleContainer: {
+    marginBottom: spacing.xxl * 2,
   },
-  headerTitle: {
+  loginTitleLine: {
+    fontSize: 28,
+    fontFamily: fonts.josefinSans.regular,
+    color: colors.accent,
+  },
+  loginTitleLineBold: {
     fontSize: 28,
     fontFamily: fonts.josefinSans.bold,
-    color: colors.white,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
+    color: colors.accent,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    fontFamily: fonts.arimo.regular,
-    color: colors.white,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  welcomeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontFamily: fonts.josefinSans.bold,
-    color: colors.text,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    fontFamily: fonts.arimo.regular,
-    color: colors.textLight,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: spacing.xl,
-  },
-  authButtons: {
+  loginFields: {
     width: '100%',
-    gap: spacing.md,
   },
-  authButton: {
-    backgroundColor: colors.accent,
+  loginButton: {
+    backgroundColor: colors.text,
     paddingVertical: spacing.lg,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.round,
     alignItems: 'center',
+    marginTop: spacing.sm,
   },
-  registerButton: {
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: colors.accent,
-  },
-  authButtonText: {
+  loginButtonText: {
     fontSize: 18,
     fontFamily: fonts.garet.bold,
     color: colors.white,
   },
-  formContainer: {
-    padding: spacing.lg,
+  loginSpacer: {
+    flex: 1,
+    minHeight: spacing.xxl,
   },
-  formTitle: {
-    fontSize: 22,
-    fontFamily: fonts.josefinSans.bold,
+  signUpRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: spacing.lg,
+  },
+  signUpText: {
+    fontSize: 15,
+    fontFamily: fonts.arimo.regular,
     color: colors.text,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
+  },
+  signUpLink: {
+    fontSize: 15,
+    fontFamily: fonts.garet.bold,
+    color: circleTextColors.orange,
+    textDecorationLine: 'underline',
   },
   inputGroup: {
     marginBottom: spacing.lg,
@@ -553,56 +555,129 @@ const styles = StyleSheet.create({
   textInput: {
     borderWidth: 1,
     borderColor: colors.gray,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     fontSize: 16,
     fontFamily: fonts.arimo.regular,
     backgroundColor: colors.white,
   },
-  row: {
-    flexDirection: 'row',
-  },
-  submitButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
   submitButtonDisabled: {
     opacity: 0.6,
   },
-  submitButtonText: {
+  registerCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    marginHorizontal: spacing.xs,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  registerCardTitle: {
+    fontSize: 22,
+    fontFamily: fonts.josefinSans.bold,
+    color: colors.text,
+    marginBottom: spacing.lg,
+  },
+  iconInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.lightGray,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+  },
+  iconTextInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    fontSize: 16,
+    fontFamily: fonts.arimo.regular,
+    color: colors.text,
+  },
+  signUpButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.round,
+    marginTop: spacing.md,
+  },
+  signUpButtonText: {
     fontSize: 18,
     fontFamily: fonts.garet.bold,
-    color: colors.white,
+    color: colors.text,
   },
-  linkButton: {
+  loginLinkRow: {
     alignItems: 'center',
     marginTop: spacing.lg,
   },
-  linkText: {
-    fontSize: 16,
+  loginLinkText: {
+    fontSize: 14,
     fontFamily: fonts.arimo.regular,
-    color: colors.accent,
+    color: colors.text,
   },
-  avatarContainer: {
-    marginBottom: spacing.md,
+  brandTitleContainer: {
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
+  },
+  avatarWrapper: {
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  avatarRing: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    padding: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
+    backgroundColor: colors.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: circleTextColors.orange,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userName: {
-    fontSize: 24,
+    fontSize: 30,
     fontFamily: fonts.josefinSans.bold,
-    color: colors.white,
-    marginBottom: spacing.xs,
+    color: colors.text,
+    textAlign: 'center',
   },
-  userEmail: {
-    fontSize: 16,
+  userTagline: {
+    fontSize: 15,
     fontFamily: fonts.arimo.regular,
-    color: colors.white,
-    opacity: 0.9,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   profileSection: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.xl,
   },
   sectionTitle: {
     fontSize: 20,
@@ -611,82 +686,104 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   infoCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightBlue,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: spacing.md,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 14,
-    fontFamily: fonts.garet.medium,
-    color: colors.textLight,
-    marginBottom: spacing.xs,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontFamily: fonts.arimo.regular,
-    color: colors.text,
-  },
-  settingsCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  settingRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
-  settingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  infoRowLast: {
+    marginBottom: 0,
   },
-  settingLabel: {
-    fontSize: 16,
+  infoLabel: {
+    fontSize: 12,
+    fontFamily: fonts.garet.medium,
+    color: colors.textLight,
+    letterSpacing: 0.5,
+  },
+  infoValue: {
+    fontSize: 15,
     fontFamily: fonts.arimo.regular,
     color: colors.text,
   },
-  logoutButton: {
-    backgroundColor: colors.accent,
+  sessionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.lightBlue,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  sessionDateBadge: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  sessionDateMonth: {
+    fontSize: 11,
+    fontFamily: fonts.garet.bold,
+    color: circleTextColors.orange,
+    letterSpacing: 0.5,
+  },
+  sessionDateDay: {
+    fontSize: 20,
+    fontFamily: fonts.josefinSans.bold,
+    color: colors.text,
+  },
+  sessionDetails: {
+    flex: 1,
+  },
+  sessionTitle: {
+    fontSize: 16,
+    fontFamily: fonts.josefinSans.bold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  sessionTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  sessionTime: {
+    fontSize: 13,
+    fontFamily: fonts.arimo.regular,
+    color: colors.textLight,
+  },
+  sessionStateContainer: {
+    backgroundColor: colors.lightBlue,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sessionStateText: {
+    fontSize: 14,
+    fontFamily: fonts.arimo.regular,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  sessionRetryText: {
+    fontSize: 14,
+    fontFamily: fonts.garet.bold,
+    color: circleTextColors.orange,
+  },
+  logoutRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.md,
-    gap: spacing.sm,
+    gap: spacing.xs,
+    marginTop: spacing.xxl,
   },
-  logoutButtonText: {
-    fontSize: 18,
+  logoutRowText: {
+    fontSize: 15,
     fontFamily: fonts.garet.bold,
-    color: colors.white,
+    color: circleTextColors.orange,
   },
 });
 

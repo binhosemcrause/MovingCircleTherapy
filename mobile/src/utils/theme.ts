@@ -8,6 +8,7 @@ export const colors = {
   black: '#000000',
   gray: '#E5E5E5',
   lightGray: '#F5F5F5',
+  lightBlue: '#E4EFF7',
 } as const;
 
 export const circleColors = {
@@ -16,6 +17,17 @@ export const circleColors = {
   yellow: '#F6E385',
   blue: '#8DB4D6',
   green: '#9FC2AF',
+} as const;
+
+// A deeper shade of each circleColors hue, for text placed on top of it —
+// shared by the home screen's circle labels and the services screen's card
+// labels so both read the same color for the same hue.
+export const circleTextColors = {
+  orange: '#9A4B1E',
+  purple: '#5B4A82',
+  yellow: '#8A7220',
+  blue: '#2F5577',
+  green: '#3F6657',
 } as const;
 
 export const fonts = {
@@ -51,5 +63,6 @@ export const borderRadius = {
   md: 8,
   lg: 12,
   xl: 16,
+  xxl: 28,
   round: 50,
 } as const;

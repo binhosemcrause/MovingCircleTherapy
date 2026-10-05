@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config';
+import { getAccessToken } from './session';
 
 export interface ApiErrorDetail {
   field?: string;
@@ -17,11 +18,14 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAccessToken();
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': 'true',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
