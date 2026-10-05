@@ -664,6 +664,11 @@ components:
             - Personalized treatment plan
             - Flexible scheduling
             - In-person or virtual
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: https://images.unsplash.com/photo-1513364776144-60967b0f800f
 
     ServiceRequest:
       type: object
@@ -708,6 +713,10 @@ components:
             - Personalized treatment plan
             - Flexible scheduling
             - In-person or virtual
+        imageUrl:
+          type: string
+          format: uri
+          example: https://images.unsplash.com/photo-1513364776144-60967b0f800f
 
     UpdateServiceRequest:
       type: object
@@ -751,6 +760,11 @@ components:
             - Personalized treatment plan
             - Flexible scheduling
             - In-person or virtual
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: https://images.unsplash.com/photo-1513364776144-60967b0f800f
 
     # ---- Availability
     AvailabilitySlot:

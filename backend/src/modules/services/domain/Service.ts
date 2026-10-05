@@ -19,6 +19,7 @@ export interface Service {
   currency: string;
   formats: SessionFormat[];
   features: string[];
+  imageUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

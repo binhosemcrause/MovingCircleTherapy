@@ -28,6 +28,7 @@ interface ServiceRow {
   currency: string;
   formats: SessionFormat[];
   features: string[];
+  image_url: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -36,7 +37,7 @@ const SELECT_SERVICE = `
   select
     s.id, s.name, s.category, s.description,
     s.duration_min_minutes, s.duration_max_minutes,
-    s.price, s.currency, s.created_at, s.updated_at,
+    s.price, s.currency, s.image_url, s.created_at, s.updated_at,
     coalesce((
       select array_agg(sf.format::text order by sf.format)
       from service_formats sf where sf.service_id = s.id
@@ -67,6 +68,7 @@ function toService(row: ServiceRow): Service {
     currency: row.currency,
     formats: row.formats,
     features: row.features,
+    imageUrl: row.image_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -96,8 +98,8 @@ export class PgServiceRepository implements IServiceRepository {
       await client.query('begin');
 
       const inserted = await client.query<{ id: string }>(
-        `insert into services (name, category, description, duration_min_minutes, duration_max_minutes, price, currency)
-         values ($1, $2, $3, $4, $5, $6, coalesce($7, 'USD'))
+        `insert into services (name, category, description, duration_min_minutes, duration_max_minutes, price, currency, image_url)
+         values ($1, $2, $3, $4, $5, $6, coalesce($7, 'USD'), $8)
          returning id`,
         [
           input.name,
@@ -107,6 +109,7 @@ export class PgServiceRepository implements IServiceRepository {
           input.durationMinutes.max,
           input.price,
           input.currency ?? null,
+          input.imageUrl ?? null,
         ],
       );
       const serviceId = inserted.rows[0]!.id;
@@ -148,7 +151,8 @@ export class PgServiceRepository implements IServiceRepository {
            duration_min_minutes = coalesce($5, duration_min_minutes),
            duration_max_minutes = coalesce($6, duration_max_minutes),
            price = coalesce($7, price),
-           currency = coalesce($8, currency)
+           currency = coalesce($8, currency),
+           image_url = coalesce($9, image_url)
          where id = $1
          returning id`,
         [
@@ -160,6 +164,7 @@ export class PgServiceRepository implements IServiceRepository {
           input.durationMinutes?.max ?? null,
           input.price ?? null,
           input.currency ?? null,
+          input.imageUrl ?? null,
         ],
       );
 

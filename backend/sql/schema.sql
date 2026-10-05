@@ -91,6 +91,7 @@ create table services (
   duration_max_minutes  integer not null,
   price                 numeric(10, 2) not null,
   currency              text not null default 'USD',
+  image_url             text,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   constraint services_duration_check check (duration_max_minutes >= duration_min_minutes)

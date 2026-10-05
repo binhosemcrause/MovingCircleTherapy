@@ -17,6 +17,7 @@ export interface CreateServiceInput {
   currency?: string;
   formats: SessionFormat[];
   features?: string[];
+  imageUrl?: string | null;
 }
 
 export interface UpdateServiceInput {
@@ -31,6 +32,7 @@ export interface UpdateServiceInput {
   currency?: string;
   formats?: SessionFormat[];
   features?: string[];
+  imageUrl?: string | null;
 }
 
 export interface IServiceRepository {

@@ -17,6 +17,7 @@ export const createServiceSchema = z.object({
   currency: z.string().length(3).optional(),
   formats: z.array(z.enum(SESSION_FORMATS)).min(1),
   features: z.array(z.string()).optional(),
+  imageUrl: z.string().url().optional(),
 });
 
 export const updateServiceSchema = z
@@ -34,6 +35,7 @@ export const updateServiceSchema = z
     currency: z.string().length(3).optional(),
     formats: z.array(z.enum(SESSION_FORMATS)).min(1).optional(),
     features: z.array(z.string()).optional(),
+    imageUrl: z.string().url().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'At least one field must be provided.' });
 

@@ -19,5 +19,6 @@ export function toServiceResponse(service: Service) {
     currency: service.currency,
     formats: service.formats,
     features: service.features,
+    imageUrl: service.imageUrl,
   };
 }
