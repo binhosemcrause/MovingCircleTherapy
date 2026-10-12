@@ -25,7 +25,7 @@ const circles: CircleItem[] = [
   { id: 1, label: 'resources', tone: tones.accent, left: 285, top: 127, diameter: 375 },
   { id: 2, label: 'my journey', tone: tones.secondarySoft, target: 'Profile', left: -15, top: 278, diameter: 290 },
   { id: 3, label: 'moving within', tone: tones.primarySoft, left: 207, top: 505, diameter: 305 },
-  { id: 4, label: 'creative circle', tone: tones.secondary, target: 'Creative', left: -75, top: 636, diameter: 340 },
+  { id: 4, label: 'creative\ncircle', tone: tones.secondary, target: 'Creative', left: -75, top: 636, diameter: 340 },
   { id: 5, label: 'therapy for all', tone: tones.primary, target: 'Services', left: 203, top: 785, diameter: 460 },
 ];
 
@@ -60,9 +60,6 @@ const HomeScreen = ({ navigation }: Props) => {
 
           {circles.map((item) => {
             const diameter = item.diameter * scale;
-            // Circles that bleed off the left edge get extra left padding so
-            // the label centres in the visible part, not the whole circle.
-            const bleed = Math.max(0, -item.left) * scale;
             return (
               <TouchableOpacity
                 key={item.id}
@@ -75,13 +72,12 @@ const HomeScreen = ({ navigation }: Props) => {
                     height: diameter,
                     borderRadius: diameter / 2,
                     backgroundColor: item.tone.background,
-                    paddingLeft: 20 + bleed,
                   },
                 ]}
                 activeOpacity={0.8}
                 onPress={() => handlePress(item)}
                 accessibilityRole="button"
-                accessibilityLabel={item.label}
+                accessibilityLabel={item.label.replace('\n', ' ')}
               >
                 <Text
                   style={[
@@ -117,7 +113,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingRight: 20,
+    paddingHorizontal: 20,
   },
   circleLabel: {
     fontFamily: typography.itemTitle.fontFamily,

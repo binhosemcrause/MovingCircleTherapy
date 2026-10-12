@@ -23,3 +23,14 @@ export function listServices(): Promise<ApiServiceSummary[]> {
 export function getService(serviceId: string): Promise<ApiService> {
   return apiFetch<ApiService>(`/services/${serviceId}`);
 }
+
+export interface ApiAvailabilitySlot {
+  start: string;
+  end: string;
+  available: boolean;
+}
+
+// `from` / `to` are calendar dates (YYYY-MM-DD).
+export function listAvailability(serviceId: string, from: string, to: string): Promise<ApiAvailabilitySlot[]> {
+  return apiFetch<ApiAvailabilitySlot[]>(`/services/${serviceId}/availability?from=${from}&to=${to}`);
+}

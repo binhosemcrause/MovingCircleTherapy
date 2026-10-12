@@ -30,6 +30,12 @@ export class RescheduleAppointmentUseCase {
       if (!newSlot) {
         throw new ConflictError('Requested slot is no longer available.', 'slot_unavailable');
       }
+      if (
+        appointment.therapistId &&
+        (await this.appointmentRepository.hasLiveAppointmentAt(appointment.therapistId, scheduledAt, appointment.id))
+      ) {
+        throw new ConflictError('This therapist is already booked at that time.', 'therapist_unavailable');
+      }
 
       const oldSlot = await this.availabilityRepository.findByAppointmentId(appointment.id);
       await this.availabilityRepository.markBooked(newSlot.id, appointment.id);

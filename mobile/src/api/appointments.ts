@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import { ApiTherapist } from './therapists';
 
 export interface ApiAppointmentService {
   id: string;
@@ -16,6 +17,7 @@ export interface ApiAppointmentService {
 export interface ApiAppointment {
   id: string;
   service: ApiAppointmentService;
+  therapist: ApiTherapist | null;
   userId: string;
   scheduledAt: string;
   format: 'in_person' | 'virtual';
@@ -26,4 +28,14 @@ export interface ApiAppointment {
 
 export function listAppointments(): Promise<ApiAppointment[]> {
   return apiFetch<ApiAppointment[]>('/appointments');
+}
+
+export interface BookAppointmentInput {
+  serviceId: string;
+  therapistId: string;
+  scheduledAt: string;
+}
+
+export function bookAppointment(input: BookAppointmentInput): Promise<ApiAppointment> {
+  return apiFetch<ApiAppointment>('/appointments', { method: 'POST', body: JSON.stringify(input) });
 }

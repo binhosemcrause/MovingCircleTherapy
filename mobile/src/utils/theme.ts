@@ -13,6 +13,8 @@ export const colors = {
   // Not in DESIGN.md: charcoal at reduced opacity for supporting text and
   // hairlines. textMuted stays above 4.5:1 on either dominant background.
   textMuted: 'rgba(43, 38, 48, 0.72)',
+  // accent1 at low opacity, for selected-but-not-solid states.
+  accentTint: 'rgba(255, 133, 77, 0.22)',
   border: 'rgba(43, 38, 48, 0.16)',
 } as const;
 

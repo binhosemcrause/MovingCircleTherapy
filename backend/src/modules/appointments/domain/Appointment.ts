@@ -4,6 +4,7 @@ export interface Appointment {
   id: string;
   userId: string;
   serviceId: string;
+  therapistId: string | null;
   scheduledAt: Date;
   format: SessionFormat;
   status: AppointmentStatus;

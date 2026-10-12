@@ -121,12 +121,38 @@ create table service_features (
 
 create index service_features_service_id_idx on service_features (service_id, position);
 
+-- ------------------------------------------------------------ Therapists
+-- Rows are seeded by sql/migrations/004_add_therapists.sql.
+
+create table therapists (
+  id           uuid primary key default gen_random_uuid(),
+  slug         text not null,
+  first_name   text not null,
+  last_name    text not null,
+  title        text not null,
+  bio          text not null default '',
+  specialties  text[] not null default '{}',
+  photo_url    text,
+  email        citext,
+  position     integer not null default 0,
+  is_active    boolean not null default true,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+create unique index therapists_slug_key on therapists (slug);
+
+create trigger therapists_set_updated_at
+  before update on therapists
+  for each row execute function set_updated_at();
+
 -- ---------------------------------------------------------- Appointments
 
 create table appointments (
   id                   uuid primary key default gen_random_uuid(),
   user_id              uuid not null references users (id) on delete cascade,
   service_id           uuid not null references services (id) on delete restrict,
+  therapist_id         uuid references therapists (id) on delete set null,
   scheduled_at         timestamptz not null,
   format               session_format not null,
   status               appointment_status not null default 'pending',
@@ -139,10 +165,38 @@ create table appointments (
 create index appointments_user_id_idx on appointments (user_id);
 create index appointments_service_id_idx on appointments (service_id);
 create index appointments_status_idx on appointments (status);
+create index appointments_therapist_id_idx on appointments (therapist_id);
+
+-- A therapist can hold only one live appointment per start time, across
+-- all services.
+create unique index appointments_therapist_scheduled_key
+  on appointments (therapist_id, scheduled_at)
+  where therapist_id is not null and status <> 'cancelled';
 
 create trigger appointments_set_updated_at
   before update on appointments
   for each row execute function set_updated_at();
+
+-- ------------------------------------------------ Therapist notifications
+-- Written in the same transaction as the booking. delivered_at stays null
+-- until a delivery channel (email / push) picks the row up.
+
+create table therapist_notifications (
+  id              uuid primary key default gen_random_uuid(),
+  therapist_id    uuid not null references therapists (id) on delete cascade,
+  appointment_id  uuid references appointments (id) on delete cascade,
+  type            text not null,
+  title           text not null,
+  body            text not null,
+  delivered_at    timestamptz,
+  read_at         timestamptz,
+  created_at      timestamptz not null default now()
+);
+
+create index therapist_notifications_therapist_idx
+  on therapist_notifications (therapist_id, created_at desc);
+create index therapist_notifications_undelivered_idx
+  on therapist_notifications (created_at) where delivered_at is null;
 
 -- ---------------------------------------------------------- Availability
 

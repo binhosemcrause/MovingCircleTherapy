@@ -9,6 +9,7 @@ See `openapi.yml` for the API contract and `sql/schema.sql` for the database sch
 - `src/modules/auth` — register, login, refresh, logout
 - `src/modules/profile` — authenticated user profile
 - `src/modules/services` — service listings and availability
+- `src/modules/therapists` — the therapists a client can book with
 - `src/modules/appointments` — booking, rescheduling, cancellation
 - `src/modules/resources` — educational resources
 - `src/modules/enquiries` — contact form submissions
@@ -30,4 +31,5 @@ npm run build      # compile to dist/
 npm start           # run compiled build
 npm run typecheck  # tsc --noEmit
 npm run db:migrate # apply sql/schema.sql to DATABASE_URL
+npm run db:seed:availability # add sample open slots (see scripts/seedAvailability.ts)
 ```

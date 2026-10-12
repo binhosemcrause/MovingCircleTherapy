@@ -11,6 +11,7 @@ export const appointmentIdParamsSchema = z.object({
 
 export const bookAppointmentSchema = z.object({
   serviceId: z.string().uuid(),
+  therapistId: z.string().uuid().optional(),
   scheduledAt: z.string().datetime(),
   format: z.enum(SESSION_FORMATS).optional(),
   notes: z.string().optional(),

@@ -158,11 +158,15 @@ const ProfileScreen = ({ navigation }: Props) => {
     }
   }, []);
 
+  // Refetch whenever the tab regains focus too, so a session booked from
+  // the Services tab shows up without logging out and in again.
   useEffect(() => {
-    if (isLoggedIn) {
-      fetchAppointments();
+    if (!isLoggedIn) {
+      return;
     }
-  }, [isLoggedIn, fetchAppointments]);
+    fetchAppointments();
+    return navigation.addListener('focus', fetchAppointments);
+  }, [isLoggedIn, fetchAppointments, navigation]);
 
   const updateLogin = (patch: Partial<LoginData>) => {
     setLoginData({ ...loginData, ...patch });
@@ -447,6 +451,11 @@ const ProfileScreen = ({ navigation }: Props) => {
         </View>
         <View style={styles.sessionDetails}>
           <Text style={styles.sessionTitle}>{next.service.name}</Text>
+          {next.therapist && (
+            <Text style={styles.sessionTherapist}>
+              with {next.therapist.firstName} {next.therapist.lastName}
+            </Text>
+          )}
           <View style={styles.sessionTimeRow}>
             <Ionicons name="time-outline" size={16} color={colors.textMuted} />
             <Text style={styles.sessionTime}>
@@ -752,6 +761,11 @@ const styles = StyleSheet.create({
     ...typography.itemTitle,
     fontSize: 18,
     lineHeight: 23,
+    color: colors.charcoal,
+    marginBottom: spacing.xs,
+  },
+  sessionTherapist: {
+    ...typography.label,
     color: colors.charcoal,
     marginBottom: spacing.xs,
   },

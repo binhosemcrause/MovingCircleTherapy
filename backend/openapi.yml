@@ -22,6 +22,8 @@ tags:
     description: Registration, login, and token management
   - name: Services
     description: Therapy services offered
+  - name: Therapists
+    description: The therapists a client can book with
   - name: Appointments
     description: Book and manage therapy appointments
   - name: Profile
@@ -258,7 +260,9 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
-          description: Requested slot is no longer available
+          description: >-
+            The slot is no longer available (`slot_unavailable`) or the chosen
+            therapist is already booked at that time (`therapist_unavailable`)
           content:
             application/json:
               schema:
@@ -386,6 +390,107 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  # ----------------------------------------------------------- Therapists
+  /therapists:
+    get:
+      tags: [Therapists]
+      summary: List the therapists available for booking
+      security: []
+      parameters:
+        - name: includeInactive
+          in: query
+          description: Also return therapists who are not currently taking bookings
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: A list of therapists, ordered by position
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Therapist'
+    post:
+      tags: [Therapists]
+      summary: Add a therapist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TherapistRequest'
+      responses:
+        '201':
+          description: Therapist created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Therapist'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /therapists/{therapistId}:
+    get:
+      tags: [Therapists]
+      summary: Get a single therapist
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TherapistId'
+      responses:
+        '200':
+          description: The therapist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Therapist'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Therapists]
+      summary: Update a therapist
+      parameters:
+        - $ref: '#/components/parameters/TherapistId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTherapistRequest'
+      responses:
+        '200':
+          description: Therapist updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Therapist'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Therapists]
+      summary: Delete a therapist
+      description: >-
+        Refused with 409 `therapist_has_appointments` while the therapist has
+        upcoming appointments; set `isActive` to false instead.
+      parameters:
+        - $ref: '#/components/parameters/TherapistId'
+      responses:
+        '204':
+          description: Therapist deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   # ------------------------------------------------------------ Resources
   /resources:
     get:
@@ -472,6 +577,13 @@ components:
         format: uuid
     AppointmentId:
       name: appointmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TherapistId:
+      name: therapistId
       in: path
       required: true
       schema:
@@ -805,6 +917,12 @@ components:
         serviceId:
           type: string
           format: uuid
+        therapistId:
+          type: string
+          format: uuid
+          description: >-
+            The therapist the client chose. When set, a notification is
+            recorded for that therapist as part of the booking.
         scheduledAt:
           type: string
           format: date-time
@@ -822,6 +940,10 @@ components:
           format: uuid
         service:
           $ref: '#/components/schemas/Service'
+        therapist:
+          allOf:
+            - $ref: '#/components/schemas/Therapist'
+          nullable: true
         userId:
           type: string
           format: uuid
@@ -837,6 +959,92 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    # ---- Therapists
+    Therapist:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        title:
+          type: string
+        bio:
+          type: string
+        specialties:
+          type: array
+          items:
+            type: string
+        photoUrl:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+          description: Inactive therapists are hidden from the list and cannot be booked
+        position:
+          type: integer
+          description: Sort order in the list, lowest first
+
+    TherapistRequest:
+      type: object
+      required: [firstName, lastName, title]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        title:
+          type: string
+        bio:
+          type: string
+        specialties:
+          type: array
+          items:
+            type: string
+        photoUrl:
+          type: string
+          format: uri
+        email:
+          type: string
+          format: email
+          description: Used to notify the therapist. Write-only; never returned.
+        isActive:
+          type: boolean
+          default: true
+        position:
+          type: integer
+          description: Defaults to the end of the list
+
+    UpdateTherapistRequest:
+      type: object
+      minProperties: 1
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        title:
+          type: string
+        bio:
+          type: string
+        specialties:
+          type: array
+          items:
+            type: string
+        photoUrl:
+          type: string
+          format: uri
+        email:
+          type: string
+          format: email
+        isActive:
+          type: boolean
+        position:
+          type: integer
 
     # ---- Resources
     Resource:

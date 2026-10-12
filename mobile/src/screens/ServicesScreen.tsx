@@ -16,7 +16,9 @@ import { colors, tones, Tone, typography, spacing, borderRadius, MIN_TOUCH } fro
 import Button from '../components/Button';
 import { ApiError } from '../api/client';
 import { ApiService, ApiServiceSummary, getService, listServices } from '../api/services';
+import { getAccessToken } from '../api/session';
 import { RootTabParamList } from '../navigation/types';
+import BookingFlow from './booking/BookingFlow';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Services'>;
 
@@ -117,6 +119,21 @@ const ServicesScreen = ({ navigation }: Props) => {
     }
   }, []);
 
+  const [isBooking, setIsBooking] = useState(false);
+
+  // Booking needs an account, so ask before the user picks a time rather
+  // than failing at the last step.
+  const startBooking = () => {
+    if (getAccessToken()) {
+      setIsBooking(true);
+      return;
+    }
+    Alert.alert('Log in to book', 'Log in or create an account to book a session.', [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Log in', onPress: () => navigation.navigate('Profile') },
+    ]);
+  };
+
   const openService = (serviceId: string) => {
     setSelectedServiceId(serviceId);
     setSelectedService(null);
@@ -127,6 +144,7 @@ const ServicesScreen = ({ navigation }: Props) => {
     setSelectedServiceId(null);
     setSelectedService(null);
     setDetailError(null);
+    setIsBooking(false);
   };
 
   const [leftColumn, rightColumn] = useMemo(() => splitIntoColumns(services), [services]);
@@ -215,7 +233,7 @@ const ServicesScreen = ({ navigation }: Props) => {
 
         <Button
           label="Book a session"
-          onPress={() => Alert.alert('Coming soon', "Booking isn't available in the app yet.")}
+          onPress={startBooking}
           style={styles.detailPrimaryAction}
         />
         <Button
@@ -226,6 +244,19 @@ const ServicesScreen = ({ navigation }: Props) => {
       </View>
     );
   };
+
+  if (isBooking && selectedService) {
+    return (
+      <BookingFlow
+        service={selectedService}
+        onCancel={() => setIsBooking(false)}
+        onReturnHome={() => {
+          closeService();
+          navigation.navigate('Home');
+        }}
+      />
+    );
+  }
 
   if (selectedServiceId) {
     const tone = selectedService ? getCategoryTone(selectedService.category) : null;

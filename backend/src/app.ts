@@ -9,6 +9,7 @@ import { createEnquiriesModule } from './modules/enquiries';
 import { createProfileModule } from './modules/profile';
 import { createResourcesModule } from './modules/resources';
 import { createServicesModule } from './modules/services';
+import { createTherapistsModule } from './modules/therapists';
 import { errorHandler, notFoundHandler } from './shared/http/errorHandler';
 import { createAuthMiddleware } from './shared/http/authMiddleware';
 import { pool } from './shared/infrastructure/db';
@@ -27,11 +28,13 @@ export function createApp(): Express {
   const authMiddleware = createAuthMiddleware(tokenService);
 
   const services = createServicesModule(pool, authMiddleware);
+  const therapists = createTherapistsModule(pool, authMiddleware);
 
   const router = express.Router();
   router.use(createAuthModule(pool, passwordHasher, tokenService, authMiddleware));
   router.use(createProfileModule(pool, authMiddleware));
   router.use(services.router);
+  router.use(therapists.router);
   router.use(
     createAppointmentsModule(
       pool,
@@ -39,6 +42,7 @@ export function createApp(): Express {
       services.serviceRepository,
       services.availabilityRepository,
       services.getServiceUseCase,
+      therapists.therapistRepository,
     ),
   );
   router.use(createResourcesModule(pool));

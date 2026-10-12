@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,8 +13,10 @@ import HomeScreen from './src/screens/HomeScreen';
 import ServicesScreen from './src/screens/ServicesScreen';
 import CreativeScreen from './src/screens/CreativeScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen';
 import { RootTabParamList } from './src/navigation/types';
 import { colors, fonts } from './src/utils/theme';
+import { hasSeenWelcome, markWelcomeSeen } from './src/utils/firstLaunch';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,8 +46,21 @@ export default function App() {
     JosefinSans_400Regular,
     JosefinSans_600SemiBold,
   });
+  // null until the stored flag has been read, so the splash stays up
+  // instead of flashing the welcome screen at returning users.
+  const [welcomeSeen, setWelcomeSeen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    hasSeenWelcome().then(setWelcomeSeen);
+  }, []);
+
   // A font failure falls back to system fonts rather than a stuck splash.
-  const isReady = fontsLoaded || !!fontError;
+  const isReady = (fontsLoaded || !!fontError) && welcomeSeen !== null;
+
+  const handleGetStarted = () => {
+    setWelcomeSeen(true);
+    markWelcomeSeen();
+  };
 
   useEffect(() => {
     if (isReady) {
@@ -55,6 +70,15 @@ export default function App() {
 
   if (!isReady) {
     return null;
+  }
+
+  if (!welcomeSeen) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <WelcomeScreen onGetStarted={handleGetStarted} />
+      </SafeAreaProvider>
+    );
   }
 
   return (
