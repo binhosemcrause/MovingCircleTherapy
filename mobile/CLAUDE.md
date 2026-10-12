@@ -35,12 +35,6 @@ This is a React Native Expo app (JavaScript, not TypeScript) with React Native's
 
 **State management:** Local `useState` only — no Redux, Context API, or global store. Authentication is mocked with no real backend integration.
 
-**Design system** (`src/utils/theme.js`): Import `colors`, `fonts`, `spacing`, and `borderRadius` from this file rather than hardcoding values inline.
+**Design system** (`src/utils/theme.ts`, tokens defined in `DESIGN.md`): Import `colors`, `tones`, `typography`, `spacing`, and `borderRadius` from this file rather than hardcoding values inline. Use `typography.*` text styles instead of setting font families and sizes by hand, `tones` for any coloured fill that carries text (the pairings are contrast-checked), and `src/components/Button.tsx` for actions.
 
-| Token | Value | Use |
-|---|---|---|
-| `colors.primary` | `#FEFAF5` | Backgrounds |
-| `colors.secondary` | `#8DB4D6` | Soft blue, inactive states |
-| `colors.accent` | `#F2A477` | Active states, CTAs |
-
-**Fonts:** `JosefinSans` (headers), `Garet` (subheaders), `Arimo` (body). Font names are defined in `theme.js` but `expo-font` is not yet wired up — custom fonts will fall back to system fonts until loading is implemented.
+**Fonts:** `Fraunces` (headings) and `Josefin Sans` (body), loaded in `App.tsx` via `expo-font` from `@expo-google-fonts/*`. DESIGN.md type sizes are on the 656-wide design canvas; `theme.ts` scales them to points.

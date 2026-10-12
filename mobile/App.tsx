@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
+import { JosefinSans_400Regular, JosefinSans_600SemiBold } from '@expo-google-fonts/josefin-sans';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -10,6 +14,9 @@ import ServicesScreen from './src/screens/ServicesScreen';
 import CreativeScreen from './src/screens/CreativeScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { RootTabParamList } from './src/navigation/types';
+import { colors, fonts } from './src/utils/theme';
+
+SplashScreen.preventAutoHideAsync();
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
@@ -31,12 +38,32 @@ function getTabIconName(routeName: keyof RootTabParamList, focused: boolean): Io
 }
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    JosefinSans_400Regular,
+    JosefinSans_600SemiBold,
+  });
+  // A font failure falls back to system fonts rather than a stuck splash.
+  const isReady = fontsLoaded || !!fontError;
+
+  useEffect(() => {
+    if (isReady) {
+      SplashScreen.hideAsync();
+    }
+  }, [isReady]);
+
+  if (!isReady) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" />
         <Tab.Navigator
           screenOptions={({ route }) => ({
+            headerShown: false,
             tabBarIcon: ({ focused, color, size }) => (
               <Ionicons
                 name={getTabIconName(route.name, focused)}
@@ -44,42 +71,23 @@ export default function App() {
                 color={color}
               />
             ),
-            tabBarActiveTintColor: '#F2A477',
-            tabBarInactiveTintColor: '#8DB4D6',
+            tabBarActiveTintColor: colors.primaryDark,
+            tabBarInactiveTintColor: colors.textMuted,
+            tabBarLabelStyle: {
+              fontFamily: fonts.body.semiBold,
+              fontSize: 12,
+            },
             tabBarStyle: {
-              backgroundColor: '#FEFAF5',
-              borderTopColor: '#8DB4D6',
+              backgroundColor: colors.dominant1,
+              borderTopColor: colors.border,
               borderTopWidth: 1,
-            },
-            headerStyle: {
-              backgroundColor: '#FEFAF5',
-            },
-            headerTintColor: '#8DB4D6',
-            headerTitleStyle: {
-              fontFamily: 'JosefinSans-Bold',
             },
           })}
         >
-          <Tab.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ headerShown: false }}
-          />
-          <Tab.Screen
-            name="Services"
-            component={ServicesScreen}
-            options={{ headerShown: false }}
-          />
-          <Tab.Screen
-            name="Creative"
-            component={CreativeScreen}
-            options={{ headerShown: false }}
-          />
-          <Tab.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{ headerShown: false }}
-          />
+          <Tab.Screen name="Home" component={HomeScreen} />
+          <Tab.Screen name="Services" component={ServicesScreen} />
+          <Tab.Screen name="Creative" component={CreativeScreen} />
+          <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

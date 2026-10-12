@@ -7,40 +7,39 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { circleColors, circleTextColors, colors, fonts, spacing, borderRadius } from '../utils/theme';
+import { colors, tones, Tone, typography, spacing, borderRadius, MIN_TOUCH } from '../utils/theme';
+import Button from '../components/Button';
 import { ApiError } from '../api/client';
 import { ApiService, ApiServiceSummary, getService, listServices } from '../api/services';
 import { RootTabParamList } from '../navigation/types';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Services'>;
 
-// Each service category gets the same pastel + text-color pairing as the
-// home screen's circle cluster (circleColors / circleTextColors in
-// theme.ts), plus a paler tint — `light` — of the same hue for the
-// secondary "Explore" button. Categories without an explicit entry fall
-// back to a deterministic pick from the same palette, so a newly added
-// category still looks intentional.
-const CATEGORY_THEME: Record<string, { background: string; light: string; text: string }> = {
-  creative_arts_therapy: { background: circleColors.orange, light: '#F8CDAE', text: circleTextColors.orange },
-  counselling: { background: circleColors.green, light: '#CBE0D3', text: circleTextColors.green },
-  family_therapy: { background: circleColors.blue, light: '#BFDAEC', text: circleTextColors.blue },
-  dance_movement_therapy: { background: circleColors.yellow, light: '#FAEFBB', text: circleTextColors.yellow },
-  couple_movement_therapy: { background: circleColors.purple, light: '#E4DEF1', text: circleTextColors.purple },
+// Each service category gets one of the palette tones (see theme.ts).
+// Categories without an explicit entry fall back to a deterministic pick
+// from the same set, so a newly added category still looks intentional.
+const CATEGORY_TONE: Record<string, Tone> = {
+  creative_arts_therapy: tones.accent,
+  counselling: tones.primary,
+  family_therapy: tones.primarySoft,
+  dance_movement_therapy: tones.secondarySoft,
+  couple_movement_therapy: tones.secondary,
 };
 
-const FALLBACK_THEMES = Object.values(CATEGORY_THEME);
+const FALLBACK_TONES = Object.values(CATEGORY_TONE);
 
-function getCategoryTheme(category: string): { background: string; light: string; text: string } {
-  const theme = CATEGORY_THEME[category];
-  if (theme) {
-    return theme;
+function getCategoryTone(category: string): Tone {
+  const tone = CATEGORY_TONE[category];
+  if (tone) {
+    return tone;
   }
   const hash = Array.from(category).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return FALLBACK_THEMES[hash % FALLBACK_THEMES.length]!;
+  return FALLBACK_TONES[hash % FALLBACK_TONES.length]!;
 }
 
 // Rough card height from the name's word count, used for each card's
@@ -132,41 +131,47 @@ const ServicesScreen = ({ navigation }: Props) => {
 
   const [leftColumn, rightColumn] = useMemo(() => splitIntoColumns(services), [services]);
 
+
   const renderServiceCard = (service: ApiServiceSummary) => {
-    const theme = getCategoryTheme(service.category);
+    const tone = getCategoryTone(service.category);
     return (
       <TouchableOpacity
         key={service.id}
         style={[
           styles.serviceCard,
-          { backgroundColor: theme.background, minHeight: estimateCardHeight(service.name) },
+          { backgroundColor: tone.background, minHeight: estimateCardHeight(service.name) },
         ]}
+        activeOpacity={0.8}
         onPress={() => openService(service.id)}
+        accessibilityRole="button"
+        accessibilityLabel={service.name}
       >
-        <Text style={[styles.serviceCardLabel, { color: theme.text }]}>{service.name}</Text>
+        <Text style={[styles.serviceCardLabel, { color: tone.text }]}>{service.name}</Text>
       </TouchableOpacity>
     );
   };
 
+  const renderErrorState = (message: string, onRetry: () => void) => (
+    <View style={styles.stateContainer}>
+      <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
+      <Text style={styles.stateText}>{message}</Text>
+      <Button label="Try again" variant="secondary" onPress={onRetry} />
+    </View>
+  );
+
+  const renderLoadingState = (label: string) => (
+    <View style={styles.stateContainer} accessibilityLabel={label}>
+      <ActivityIndicator size="large" color={colors.primaryDark} />
+    </View>
+  );
+
   const renderServicesContent = () => {
     if (isLoading) {
-      return (
-        <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      );
+      return renderLoadingState('Loading services');
     }
 
     if (error) {
-      return (
-        <View style={styles.stateContainer}>
-          <Ionicons name="cloud-offline-outline" size={40} color={colors.textLight} />
-          <Text style={styles.stateText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchServices}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      return renderErrorState(error, fetchServices);
     }
 
     if (services.length === 0) {
@@ -187,65 +192,62 @@ const ServicesScreen = ({ navigation }: Props) => {
 
   const renderDetailContent = () => {
     if (isDetailLoading) {
-      return (
-        <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      );
+      return renderLoadingState('Loading service');
     }
 
     if (detailError) {
-      return (
-        <View style={styles.stateContainer}>
-          <Ionicons name="cloud-offline-outline" size={40} color={colors.textLight} />
-          <Text style={styles.stateText}>{detailError}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => selectedServiceId && fetchServiceDetail(selectedServiceId)}
-          >
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      return renderErrorState(detailError, () => selectedServiceId && fetchServiceDetail(selectedServiceId));
     }
 
     if (!selectedService) {
       return null;
     }
 
-    const theme = getCategoryTheme(selectedService.category);
-
     return (
       <View style={styles.detailBody}>
-        <Text style={[styles.detailTitle, { color: theme.text }]}>{selectedService.name}</Text>
+        <Text style={styles.detailTitle} accessibilityRole="header">
+          {selectedService.name}
+        </Text>
         {/* Every service is offered in all three modalities, so this line is
             fixed copy rather than something read off the API response. */}
         <Text style={styles.detailSubtitle}>Individual · Couples · Family</Text>
         <Text style={styles.detailDescription}>{selectedService.description}</Text>
 
-        <TouchableOpacity style={[styles.primaryButton, { backgroundColor: theme.background }]}>
-          <Text style={[styles.primaryButtonText, { color: theme.text }]}>Book a session</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: theme.light }]}>
-          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>
-            Explore a self guided activity
-          </Text>
-        </TouchableOpacity>
+        <Button
+          label="Book a session"
+          onPress={() => Alert.alert('Coming soon', "Booking isn't available in the app yet.")}
+          style={styles.detailPrimaryAction}
+        />
+        <Button
+          label="Explore a self guided activity"
+          variant="secondary"
+          onPress={() => navigation.navigate('Creative')}
+        />
       </View>
     );
   };
 
   if (selectedServiceId) {
+    const tone = selectedService ? getCategoryTone(selectedService.category) : null;
     return (
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={[styles.heroContainer, { marginTop: insets.top + spacing.md }]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.heroContainer, { marginTop: insets.top }]}>
           {selectedService?.imageUrl ? (
             <Image source={{ uri: selectedService.imageUrl }} style={styles.heroImage} />
           ) : (
-            <View style={[styles.heroImage, styles.heroPlaceholder]} />
+            <View style={[styles.heroImage, { backgroundColor: tone?.background ?? colors.dominant2 }]} />
           )}
-          <TouchableOpacity style={styles.backButton} onPress={closeService} hitSlop={10}>
-            <Ionicons name="arrow-back" size={20} color={colors.white} />
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={closeService}
+            accessibilityRole="button"
+            accessibilityLabel="Back to services"
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.charcoal} />
           </TouchableOpacity>
         </View>
 
@@ -255,20 +257,19 @@ const ServicesScreen = ({ navigation }: Props) => {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={[styles.listHeader, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity
-          style={styles.listBackButton}
-          onPress={() => navigation.navigate('Home')}
-          hitSlop={10}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.white} />
-        </TouchableOpacity>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={[styles.listHeader, { paddingTop: insets.top + spacing.lg }]}>
+        <Text style={styles.screenTitle} accessibilityRole="header">
+          Services
+        </Text>
+        <Text style={styles.screenSubtitle}>Choose a therapy to learn more or book a session.</Text>
       </View>
 
-      <View style={styles.servicesContainer}>
-        {renderServicesContent()}
-      </View>
+      <View style={styles.servicesContainer}>{renderServicesContent()}</View>
     </ScrollView>
   );
 };
@@ -276,18 +277,22 @@ const ServicesScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.dominant1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl,
   },
   listHeader: {
     paddingHorizontal: spacing.lg,
   },
-  listBackButton: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.round,
-    backgroundColor: colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  screenTitle: {
+    ...typography.h1,
+    color: colors.charcoal,
+  },
+  screenSubtitle: {
+    ...typography.paragraph,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
   },
   heroContainer: {
     width: '100%',
@@ -297,17 +302,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  heroPlaceholder: {
-    backgroundColor: colors.lightGray,
-  },
   backButton: {
     position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.round,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    top: spacing.md,
+    left: spacing.md,
+    width: MIN_TOUCH,
+    height: MIN_TOUCH,
+    borderRadius: MIN_TOUCH / 2,
+    backgroundColor: colors.dominant1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -320,21 +322,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   stateText: {
-    fontSize: 16,
-    fontFamily: fonts.arimo.regular,
-    color: colors.textLight,
+    ...typography.paragraph,
+    color: colors.textMuted,
     textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.md,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontFamily: fonts.garet.bold,
-    color: colors.white,
   },
   grid: {
     flexDirection: 'row',
@@ -348,52 +338,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: borderRadius.xxl,
-    paddingHorizontal: spacing.md,
+    padding: spacing.md,
   },
+  // One step under itemTitle so single long words ("Counselling") still
+  // fit a half-width card on small phones.
   serviceCardLabel: {
-    fontSize: 16,
-    fontFamily: fonts.josefinSans.bold,
+    ...typography.itemTitle,
+    fontSize: 18,
+    lineHeight: 23,
     textAlign: 'center',
   },
   detailBody: {
     paddingTop: spacing.sm,
   },
   detailTitle: {
-    fontSize: 22,
-    fontFamily: fonts.josefinSans.bold,
+    ...typography.h2,
+    color: colors.charcoal,
   },
   detailSubtitle: {
-    fontSize: 14,
-    fontFamily: fonts.arimo.regular,
-    color: colors.textLight,
-    marginTop: spacing.xs,
+    ...typography.label,
+    color: colors.secondaryDark,
+    marginTop: spacing.sm,
   },
   detailDescription: {
-    fontSize: 15,
-    fontFamily: fonts.arimo.regular,
-    color: colors.text,
-    lineHeight: 22,
+    ...typography.paragraph,
+    color: colors.charcoal,
     marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
-  primaryButton: {
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.round,
-    alignItems: 'center',
+  detailPrimaryAction: {
     marginBottom: spacing.md,
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontFamily: fonts.garet.bold,
-  },
-  secondaryButton: {
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.round,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontFamily: fonts.garet.medium,
   },
 });
 

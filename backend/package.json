@@ -12,6 +12,8 @@
     "db:migrate": "node -e \"require('dotenv').config(); const fs=require('fs'); const {Pool}=require('pg'); const pool=new Pool({connectionString:process.env.DATABASE_URL}); pool.query(fs.readFileSync('sql/schema.sql','utf8')).then(()=>{console.log('schema applied');pool.end();}).catch(e=>{console.error(e);pool.end();process.exit(1);});\""
   },
   "dependencies": {
+    "@neon/config": "^1.8.4",
+    "@neon/env": "^1.5.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
