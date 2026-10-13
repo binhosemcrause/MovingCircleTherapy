@@ -4,9 +4,8 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
-  TextInput,
-  TextInputProps,
   Alert,
   Image,
   ActivityIndicator,
@@ -17,17 +16,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, tones, typography, spacing, borderRadius, MIN_TOUCH } from '../utils/theme';
+import { colors, tones, typography, spacing, borderRadius } from '../utils/theme';
 import Button from '../components/Button';
+import FormField from '../components/FormField';
+import TeamSection from './profile/TeamSection';
 import { RootTabParamList } from '../navigation/types';
 import { ApiError, ApiUser, loginUser, registerUser } from '../api/auth';
 import { setAccessToken, clearSession } from '../api/session';
-import { formatTime } from './booking/format';
-import { ApiAppointment, listAppointments } from '../api/appointments';
-import { ApiNotification, listNotifications, markNotificationsRead } from '../api/notifications';
+import { formatSessionDateTime } from './booking/format';
+import {
+  ApiAppointment,
+  ApiAssignedAppointment,
+  cancelAppointment,
+  listAppointments,
+  listAssignedAppointments,
+} from '../api/appointments';
+import { listNotifications, markNotificationsRead } from '../api/notifications';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Profile'>;
-type IoniconName = keyof typeof Ionicons.glyphMap;
 
 interface LoginData {
   email: string;
@@ -86,45 +92,7 @@ function describeApiError(error: unknown): string {
   return 'Could not reach the server. Please check your connection and try again.';
 }
 
-interface FormFieldProps extends TextInputProps {
-  label: string;
-  icon: IoniconName;
-  // Password fields get a show/hide toggle instead of staying masked.
-  secure?: boolean;
-}
-
-const FormField = ({ label, icon, secure = false, ...inputProps }: FormFieldProps) => {
-  const [isHidden, setIsHidden] = useState(secure);
-  const [isFocused, setIsFocused] = useState(false);
-
-  return (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={[styles.inputContainer, isFocused && styles.inputContainerFocused]}>
-        <Ionicons name={icon} size={20} color={colors.textMuted} />
-        <TextInput
-          style={styles.textInput}
-          placeholderTextColor={colors.textMuted}
-          accessibilityLabel={label}
-          secureTextEntry={isHidden}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          {...inputProps}
-        />
-        {secure && (
-          <TouchableOpacity
-            style={styles.inputToggle}
-            onPress={() => setIsHidden(!isHidden)}
-            accessibilityRole="button"
-            accessibilityLabel={isHidden ? `Show ${label}` : `Hide ${label}`}
-          >
-            <Ionicons name={isHidden ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-};
+const SESSIONS_POLL_MS = 20000;
 
 const ProfileScreen = ({ navigation }: Props) => {
   // Neither state of this tab has a native header (headerShown: false in
@@ -147,6 +115,9 @@ const ProfileScreen = ({ navigation }: Props) => {
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
 
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   const fetchAppointments = useCallback(async () => {
     setIsLoadingAppointments(true);
     setAppointmentsError(null);
@@ -160,22 +131,28 @@ const ProfileScreen = ({ navigation }: Props) => {
     }
   }, []);
 
-  const [notifications, setNotifications] = useState<ApiNotification[]>([]);
-  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  // Therapists see the sessions clients booked with them instead of their
+  // own bookings.
   const isTherapist = !!apiUser?.therapistId;
+  const [assigned, setAssigned] = useState<ApiAssignedAppointment[]>([]);
+  const [assignedError, setAssignedError] = useState<string | null>(null);
+  // Sessions the therapist hasn't seen yet, from their unread notifications.
+  const [newAppointmentIds, setNewAppointmentIds] = useState<string[]>([]);
 
-  const fetchNotifications = useCallback(async () => {
-    setNotificationsError(null);
+  const fetchTherapistSessions = useCallback(async () => {
+    setAssignedError(null);
     try {
-      const data = await listNotifications();
-      setNotifications(data);
+      const [sessions, notifications] = await Promise.all([listAssignedAppointments(), listNotifications()]);
+      setAssigned(sessions);
+      const unread = notifications.filter((notification) => !notification.read);
+      setNewAppointmentIds(unread.flatMap((notification) => notification.appointment?.id ?? []));
       // What was just fetched keeps its "New" tag on screen; the next visit
       // shows it as seen.
-      if (data.some((notification) => !notification.read)) {
+      if (unread.length > 0) {
         markNotificationsRead().catch(() => undefined);
       }
     } catch (err) {
-      setNotificationsError(describeApiError(err));
+      setAssignedError(describeApiError(err));
     }
   }, []);
 
@@ -183,19 +160,37 @@ const ProfileScreen = ({ navigation }: Props) => {
     if (!isTherapist) {
       return;
     }
-    fetchNotifications();
-    return navigation.addListener('focus', fetchNotifications);
-  }, [isTherapist, fetchNotifications, navigation]);
+    fetchTherapistSessions();
+    // A client can book at any moment, so besides refetching when the tab
+    // regains focus, keep the list fresh while the therapist is looking at it.
+    const poll = setInterval(() => {
+      if (navigation.isFocused()) {
+        fetchTherapistSessions();
+      }
+    }, SESSIONS_POLL_MS);
+    const unsubscribe = navigation.addListener('focus', fetchTherapistSessions);
+    return () => {
+      clearInterval(poll);
+      unsubscribe();
+    };
+  }, [isTherapist, fetchTherapistSessions, navigation]);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await (isTherapist ? fetchTherapistSessions() : fetchAppointments());
+    setIsRefreshing(false);
+  };
 
   // Refetch whenever the tab regains focus too, so a session booked from
   // the Services tab shows up without logging out and in again.
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || isTherapist) {
       return;
     }
     fetchAppointments();
     return navigation.addListener('focus', fetchAppointments);
-  }, [isLoggedIn, fetchAppointments, navigation]);
+  }, [isLoggedIn, isTherapist, fetchAppointments, navigation]);
 
   const updateLogin = (patch: Partial<LoginData>) => {
     setLoginData({ ...loginData, ...patch });
@@ -271,6 +266,30 @@ const ProfileScreen = ({ navigation }: Props) => {
     }
   };
 
+  const handleCancelSession = (session: ApiAppointment) => {
+    const confirmCancel = async () => {
+      setCancellingId(session.id);
+      setCancelError(null);
+      try {
+        await cancelAppointment(session.id);
+        setAppointments((current) => current.filter((appointment) => appointment.id !== session.id));
+      } catch (err) {
+        setCancelError(describeApiError(err));
+      } finally {
+        setCancellingId(null);
+      }
+    };
+
+    Alert.alert(
+      'Cancel session',
+      `Cancel ${session.service.name} on ${formatSessionDateTime(session.scheduledAt)}? Your time will be released for someone else.`,
+      [
+        { text: 'Keep session', style: 'cancel' },
+        { text: 'Cancel session', style: 'destructive', onPress: confirmCancel },
+      ],
+    );
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Log out',
@@ -285,7 +304,8 @@ const ProfileScreen = ({ navigation }: Props) => {
             setIsLoggedIn(false);
             setApiUser(null);
             setAppointments([]);
-            setNotifications([]);
+            setAssigned([]);
+            setNewAppointmentIds([]);
             setShowRegisterForm(false);
             setLoginData(emptyLoginData);
             setRegisterData(emptyRegisterData);
@@ -317,6 +337,10 @@ const ProfileScreen = ({ navigation }: Props) => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView
+        // Login and sign-up share this layout, so without a key React would
+        // carry each field's state (e.g. a hidden password) over to whichever
+        // field sits in the same position on the other form.
+        key={showRegisterForm ? 'register' : 'login'}
         contentContainerStyle={[styles.authScreen, { paddingTop: insets.top + spacing.xl }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -461,9 +485,8 @@ const ProfileScreen = ({ navigation }: Props) => {
     const upcoming = appointments
       .filter((a) => a.status !== 'cancelled' && new Date(a.scheduledAt).getTime() >= now)
       .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-    const next = upcoming[0];
 
-    if (!next) {
+    if (upcoming.length === 0) {
       return (
         <View style={styles.sessionStateContainer}>
           <Text style={styles.sessionStateText}>No upcoming sessions.</Text>
@@ -472,83 +495,92 @@ const ProfileScreen = ({ navigation }: Props) => {
       );
     }
 
-    const { month, day } = formatSessionDate(next.scheduledAt);
     return (
-      <View style={styles.sessionCard}>
-        <View style={styles.sessionDateBadge}>
-          <Text style={styles.sessionDateMonth}>{month}</Text>
-          <Text style={styles.sessionDateDay}>{day}</Text>
-        </View>
-        <View style={styles.sessionDetails}>
-          <Text style={styles.sessionTitle}>{next.service.name}</Text>
-          {next.therapist && (
-            <Text style={styles.sessionTherapist}>
-              with {next.therapist.firstName} {next.therapist.lastName}
-            </Text>
-          )}
-          <View style={styles.sessionTimeRow}>
-            <Ionicons name="time-outline" size={16} color={colors.textMuted} />
-            <Text style={styles.sessionTime}>
-              {formatSessionTimeRange(next.scheduledAt, next.service.durationMinutes.max)}
-            </Text>
+      <View style={styles.requestList}>
+        {cancelError && (
+          <View style={styles.formError} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            <Ionicons name="alert-circle" size={20} color={colors.accentDark} />
+            <Text style={styles.formErrorText}>{cancelError}</Text>
           </View>
-        </View>
+        )}
+        {upcoming.map((session) => {
+          const { month, day } = formatSessionDate(session.scheduledAt);
+          return (
+            <View key={session.id} style={styles.sessionCard}>
+              <View style={styles.sessionDateBadge}>
+                <Text style={styles.sessionDateMonth}>{month}</Text>
+                <Text style={styles.sessionDateDay}>{day}</Text>
+              </View>
+              <View style={styles.sessionDetails}>
+                <Text style={styles.sessionTitle}>{session.service.name}</Text>
+                {session.therapist && (
+                  <Text style={styles.sessionTherapist}>
+                    with {session.therapist.firstName} {session.therapist.lastName}
+                  </Text>
+                )}
+                <View style={styles.sessionTimeRow}>
+                  <Ionicons name="time-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.sessionTime}>
+                    {formatSessionTimeRange(session.scheduledAt, session.service.durationMinutes.max)}
+                  </Text>
+                </View>
+                <Button
+                  label="Cancel session"
+                  variant="link"
+                  loading={cancellingId === session.id}
+                  disabled={cancellingId !== null}
+                  onPress={() => handleCancelSession(session)}
+                  style={styles.cancelButton}
+                />
+              </View>
+            </View>
+          );
+        })}
       </View>
     );
   };
 
-  const renderSessionRequests = () => {
-    if (notificationsError) {
+  const renderTherapistSessions = () => {
+    if (assignedError) {
       return (
         <View style={styles.sessionStateContainer}>
-          <Text style={styles.sessionStateText}>{notificationsError}</Text>
-          <Button label="Try again" variant="link" onPress={fetchNotifications} />
+          <Text style={styles.sessionStateText}>{assignedError}</Text>
+          <Button label="Try again" variant="link" onPress={fetchTherapistSessions} />
         </View>
       );
     }
 
-    if (notifications.length === 0) {
+    const now = Date.now();
+    const upcoming = assigned.filter((a) => a.status !== 'cancelled' && new Date(a.scheduledAt).getTime() >= now);
+    if (upcoming.length === 0) {
       return (
         <View style={styles.sessionStateContainer}>
-          <Text style={styles.sessionStateText}>No session requests yet.</Text>
+          <Text style={styles.sessionStateText}>No sessions booked with you yet.</Text>
         </View>
       );
     }
 
     return (
       <View style={styles.requestList}>
-        {notifications.map((notification) => {
-          const { appointment } = notification;
-          if (!appointment) {
-            return (
-              <View key={notification.id} style={styles.sessionCard}>
-                <View style={styles.sessionDetails}>
-                  <Text style={styles.sessionTitle}>{notification.title}</Text>
-                  <Text style={styles.sessionTime}>{notification.body}</Text>
-                </View>
-              </View>
-            );
-          }
-
-          const { month, day } = formatSessionDate(appointment.scheduledAt);
-          const isCancelled = appointment.status === 'cancelled';
+        {upcoming.map((session) => {
+          const { month, day } = formatSessionDate(session.scheduledAt);
           return (
-            <View key={notification.id} style={styles.sessionCard}>
+            <View key={session.id} style={styles.sessionCard}>
               <View style={styles.sessionDateBadge}>
                 <Text style={styles.sessionDateMonth}>{month}</Text>
                 <Text style={styles.sessionDateDay}>{day}</Text>
               </View>
               <View style={styles.sessionDetails}>
-                <Text style={styles.sessionTitle}>{appointment.clientName}</Text>
-                <Text style={styles.sessionTherapist}>{appointment.serviceName}</Text>
+                <Text style={styles.sessionTitle}>{session.clientName}</Text>
+                <Text style={styles.sessionTherapist}>{session.service.name}</Text>
                 <View style={styles.sessionTimeRow}>
                   <Ionicons name="time-outline" size={16} color={colors.textMuted} />
                   <Text style={styles.sessionTime}>
-                    {isCancelled ? 'Cancelled' : formatTime(new Date(appointment.scheduledAt))}
+                    {formatSessionTimeRange(session.scheduledAt, session.service.durationMinutes.max)}
                   </Text>
                 </View>
               </View>
-              {!notification.read && (
+              {newAppointmentIds.includes(session.id) && (
                 <View style={styles.newTag}>
                   <Text style={styles.newTagText}>NEW</Text>
                 </View>
@@ -572,6 +604,10 @@ const ProfileScreen = ({ navigation }: Props) => {
       style={styles.container}
       contentContainerStyle={{ paddingTop: insets.top + spacing.xl, paddingBottom: spacing.xl }}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primaryDark} />
+      }
     >
       <View style={styles.brandTitleContainer}>{renderBrandTitle()}</View>
 
@@ -618,21 +654,14 @@ const ProfileScreen = ({ navigation }: Props) => {
         </View>
       </View>
 
-      {isTherapist && (
-        <View style={styles.profileSection}>
-          <Text style={styles.sectionTitle} accessibilityRole="header">
-            Session requests
-          </Text>
-          {renderSessionRequests()}
-        </View>
-      )}
-
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle} accessibilityRole="header">
-          Upcoming sessions
+          {isTherapist ? 'Your sessions' : 'Upcoming sessions'}
         </Text>
-        {renderUpcomingSessions()}
+        {isTherapist ? renderTherapistSessions() : renderUpcomingSessions()}
       </View>
+
+      {apiUser?.role === 'admin' && <TeamSection />}
 
       <Button label="Log out" variant="secondary" onPress={handleLogout} style={styles.logoutButton} />
     </ScrollView>
@@ -669,43 +698,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.sm,
     marginBottom: spacing.xl,
-  },
-  inputGroup: {
-    marginBottom: spacing.md,
-  },
-  inputLabel: {
-    ...typography.label,
-    color: colors.charcoal,
-    marginBottom: spacing.sm,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 54,
-    backgroundColor: colors.white,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    paddingLeft: spacing.md,
-  },
-  inputContainerFocused: {
-    borderColor: colors.primaryDark,
-  },
-  textInput: {
-    ...typography.paragraph,
-    // lineHeight on a TextInput misaligns the caret on iOS.
-    lineHeight: undefined,
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingRight: spacing.md,
-    color: colors.charcoal,
-  },
-  inputToggle: {
-    width: MIN_TOUCH,
-    height: MIN_TOUCH,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   formError: {
     flexDirection: 'row',
@@ -879,6 +871,11 @@ const styles = StyleSheet.create({
   sessionTime: {
     ...typography.label,
     color: colors.textMuted,
+  },
+  cancelButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 0,
+    marginTop: spacing.xs,
   },
   requestList: {
     gap: spacing.sm,

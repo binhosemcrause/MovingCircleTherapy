@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { CreateTherapistInput, UpdateTherapistInput } from '../domain/ITherapistRepository';
+import type { CreateTherapistAccountUseCase } from '../application/CreateTherapistAccountUseCase';
 import type { CreateTherapistUseCase } from '../application/CreateTherapistUseCase';
 import type { DeleteTherapistUseCase } from '../application/DeleteTherapistUseCase';
 import type { GetTherapistUseCase } from '../application/GetTherapistUseCase';
@@ -14,6 +15,7 @@ export class TherapistsController {
     private readonly createTherapistUseCase: CreateTherapistUseCase,
     private readonly updateTherapistUseCase: UpdateTherapistUseCase,
     private readonly deleteTherapistUseCase: DeleteTherapistUseCase,
+    private readonly createTherapistAccountUseCase: CreateTherapistAccountUseCase,
   ) {}
 
   list = async (req: Request, res: Response): Promise<void> => {
@@ -37,6 +39,13 @@ export class TherapistsController {
     const { therapistId } = req.params as { therapistId: string };
     const therapist = await this.updateTherapistUseCase.execute(therapistId, req.body as UpdateTherapistInput);
     res.status(200).json(toTherapistResponse(therapist));
+  };
+
+  createAccount = async (req: Request, res: Response): Promise<void> => {
+    const { therapistId } = req.params as { therapistId: string };
+    const { email } = req.body as { email: string };
+    const account = await this.createTherapistAccountUseCase.execute({ therapistId, email });
+    res.status(200).json(account);
   };
 
   delete = async (req: Request, res: Response): Promise<void> => {

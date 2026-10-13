@@ -15,5 +15,10 @@ export type SessionFormat = (typeof SESSION_FORMATS)[number];
 export const APPOINTMENT_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'] as const;
 export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
 
+// A therapist who is also an admin has role 'admin'; what makes someone a
+// therapist is the therapist record linked to their account.
+export const USER_ROLES = ['client', 'therapist', 'admin'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
 export const RESOURCE_TYPES = ['article', 'worksheet', 'video', 'tool'] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];

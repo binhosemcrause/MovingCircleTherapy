@@ -1,3 +1,5 @@
+import type { UserRole } from '../../../shared/domain/enums';
+
 export interface User {
   id: string;
   firstName: string;
@@ -8,6 +10,7 @@ export interface User {
   location: string | null;
   tagline: string | null;
   avatarUrl: string | null;
+  role: UserRole;
   // Set when this account belongs to one of the practice's therapists.
   therapistId: string | null;
   createdAt: Date;
@@ -23,6 +26,7 @@ export interface PublicUser {
   location: string | null;
   tagline: string | null;
   avatarUrl: string | null;
+  role: UserRole;
   therapistId: string | null;
   createdAt: string;
 }
@@ -37,6 +41,7 @@ export function toPublicUser(user: User): PublicUser {
     location: user.location,
     tagline: user.tagline,
     avatarUrl: user.avatarUrl,
+    role: user.role,
     therapistId: user.therapistId,
     createdAt: user.createdAt.toISOString(),
   };

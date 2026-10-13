@@ -13,3 +13,8 @@ export interface Appointment {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// An appointment as its therapist sees it.
+export interface AssignedAppointment extends Appointment {
+  clientName: string;
+}

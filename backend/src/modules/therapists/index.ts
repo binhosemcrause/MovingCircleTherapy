@@ -1,5 +1,9 @@
 import type { Router, RequestHandler } from 'express';
 import type { Pool } from 'pg';
+import { env } from '../../config/env';
+import type { PasswordHasher } from '../../shared/security/PasswordHasher';
+import { PgUserRepository } from '../users/infrastructure/PgUserRepository';
+import { CreateTherapistAccountUseCase } from './application/CreateTherapistAccountUseCase';
 import { CreateTherapistUseCase } from './application/CreateTherapistUseCase';
 import { DeleteTherapistUseCase } from './application/DeleteTherapistUseCase';
 import { GetTherapistUseCase } from './application/GetTherapistUseCase';
@@ -14,7 +18,12 @@ export interface TherapistsModule {
   therapistRepository: PgTherapistRepository;
 }
 
-export function createTherapistsModule(pool: Pool, authMiddleware: RequestHandler): TherapistsModule {
+export function createTherapistsModule(
+  pool: Pool,
+  authMiddleware: RequestHandler,
+  requireAdmin: RequestHandler,
+  passwordHasher: PasswordHasher,
+): TherapistsModule {
   const therapistRepository = new PgTherapistRepository(pool);
 
   const controller = new TherapistsController(
@@ -23,10 +32,16 @@ export function createTherapistsModule(pool: Pool, authMiddleware: RequestHandle
     new CreateTherapistUseCase(therapistRepository),
     new UpdateTherapistUseCase(therapistRepository),
     new DeleteTherapistUseCase(therapistRepository),
+    new CreateTherapistAccountUseCase(
+      therapistRepository,
+      new PgUserRepository(pool),
+      passwordHasher,
+      env.ADMIN_EMAILS,
+    ),
   );
 
   return {
-    router: createTherapistsRoutes(controller, authMiddleware),
+    router: createTherapistsRoutes(controller, authMiddleware, requireAdmin),
     therapistRepository,
   };
 }

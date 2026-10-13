@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { AppointmentStatus, SessionFormat } from '../../../shared/domain/enums';
 import type { BookAppointmentUseCase } from '../application/BookAppointmentUseCase';
 import type { CancelAppointmentUseCase } from '../application/CancelAppointmentUseCase';
+import type { ListAssignedAppointmentsUseCase } from '../application/ListAssignedAppointmentsUseCase';
 import type { GetAppointmentUseCase } from '../application/GetAppointmentUseCase';
 import type { ListAppointmentsUseCase } from '../application/ListAppointmentsUseCase';
 import type { RescheduleAppointmentUseCase } from '../application/RescheduleAppointmentUseCase';
@@ -14,6 +15,7 @@ export class AppointmentsController {
     private readonly bookAppointmentUseCase: BookAppointmentUseCase,
     private readonly rescheduleAppointmentUseCase: RescheduleAppointmentUseCase,
     private readonly cancelAppointmentUseCase: CancelAppointmentUseCase,
+    private readonly listAssignedAppointmentsUseCase: ListAssignedAppointmentsUseCase,
     private readonly lookups: AppointmentLookups,
   ) {}
 
@@ -21,6 +23,18 @@ export class AppointmentsController {
     const { status } = req.query as { status?: AppointmentStatus };
     const appointments = await this.listAppointmentsUseCase.execute({ userId: req.userId!, status });
     res.status(200).json(await toAppointmentResponseList(appointments, this.lookups));
+  };
+
+  listAssigned = async (req: Request, res: Response): Promise<void> => {
+    const appointments = await this.listAssignedAppointmentsUseCase.execute(req.userId!);
+    res.status(200).json(
+      await Promise.all(
+        appointments.map(async (appointment) => ({
+          ...(await toAppointmentResponse(appointment, this.lookups)),
+          clientName: appointment.clientName,
+        })),
+      ),
+    );
   };
 
   get = async (req: Request, res: Response): Promise<void> => {

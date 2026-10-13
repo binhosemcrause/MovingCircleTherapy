@@ -1,5 +1,5 @@
 import type { AppointmentStatus, SessionFormat } from '../../../shared/domain/enums';
-import type { Appointment } from './Appointment';
+import type { Appointment, AssignedAppointment } from './Appointment';
 
 export interface CreateAppointmentInput {
   userId: string;
@@ -23,6 +23,8 @@ export interface UpdateAppointmentInput {
 
 export interface IAppointmentRepository {
   findByUser(userId: string, status?: AppointmentStatus): Promise<Appointment[]>;
+  // Sessions booked with the therapist this user account belongs to.
+  findByTherapistUser(userId: string): Promise<AssignedAppointment[]>;
   findById(id: string): Promise<Appointment | null>;
   update(id: string, input: UpdateAppointmentInput): Promise<Appointment>;
 

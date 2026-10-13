@@ -10,6 +10,7 @@ interface TherapistRow {
   bio: string;
   specialties: string[];
   photo_url: string | null;
+  user_id: string | null;
   is_active: boolean;
   position: number;
 }
@@ -23,6 +24,7 @@ function toTherapist(row: TherapistRow): Therapist {
     bio: row.bio,
     specialties: row.specialties,
     photoUrl: row.photo_url,
+    userId: row.user_id,
     isActive: row.is_active,
     position: row.position,
   };
@@ -127,5 +129,9 @@ export class PgTherapistRepository implements ITherapistRepository {
       [id],
     );
     return result.rows.length > 0;
+  }
+
+  async linkUser(id: string, userId: string, email: string): Promise<void> {
+    await this.pool.query('update therapists set user_id = $2, email = $3 where id = $1', [id, userId, email]);
   }
 }

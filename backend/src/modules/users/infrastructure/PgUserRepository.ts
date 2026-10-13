@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { CreateUserInput, IUserRepository, UpdateUserInput } from '../domain/IUserRepository';
+import type { UserRole } from '../../../shared/domain/enums';
 import type { User } from '../domain/User';
 
 interface UserRow {
@@ -12,6 +13,7 @@ interface UserRow {
   location: string | null;
   tagline: string | null;
   avatar_url: string | null;
+  role: UserRole;
   therapist_id?: string | null;
   created_at: Date;
   updated_at: Date;
@@ -28,6 +30,7 @@ function toUser(row: UserRow): User {
     location: row.location,
     tagline: row.tagline,
     avatarUrl: row.avatar_url,
+    role: row.role,
     therapistId: row.therapist_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -53,10 +56,10 @@ export class PgUserRepository implements IUserRepository {
 
   async create(input: CreateUserInput): Promise<User> {
     const result = await this.pool.query<UserRow>(
-      `insert into users (first_name, last_name, email, password_hash, phone)
-       values ($1, $2, $3, $4, $5)
+      `insert into users (first_name, last_name, email, password_hash, phone, role)
+       values ($1, $2, $3, $4, $5, $6)
        returning *`,
-      [input.firstName, input.lastName, input.email, input.passwordHash, input.phone ?? null],
+      [input.firstName, input.lastName, input.email, input.passwordHash, input.phone ?? null, input.role ?? 'client'],
     );
     return toUser(result.rows[0]!);
   }
@@ -86,5 +89,9 @@ export class PgUserRepository implements IUserRepository {
       ],
     );
     return toUser(result.rows[0]!);
+  }
+
+  async setRole(id: string, role: UserRole): Promise<void> {
+    await this.pool.query('update users set role = $2 where id = $1', [id, role]);
   }
 }

@@ -1,3 +1,4 @@
+import type { UserRole } from '../../../shared/domain/enums';
 import type { User } from './User';
 
 export interface CreateUserInput {
@@ -6,6 +7,8 @@ export interface CreateUserInput {
   email: string;
   passwordHash: string;
   phone?: string;
+  // Defaults to client.
+  role?: UserRole;
 }
 
 export interface UpdateUserInput {
@@ -22,4 +25,5 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;
   create(input: CreateUserInput): Promise<User>;
   update(id: string, input: UpdateUserInput): Promise<User>;
+  setRole(id: string, role: UserRole): Promise<void>;
 }

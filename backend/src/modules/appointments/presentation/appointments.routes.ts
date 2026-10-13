@@ -16,6 +16,8 @@ export function createAppointmentsRoutes(controller: AppointmentsController, aut
 
   router.get('/appointments', validate({ query: listAppointmentsQuerySchema }), asyncHandler(controller.list));
   router.post('/appointments', validate({ body: bookAppointmentSchema }), asyncHandler(controller.book));
+  // Before /:appointmentId, which would otherwise reject "assigned" as an id.
+  router.get('/appointments/assigned', asyncHandler(controller.listAssigned));
   router.get(
     '/appointments/:appointmentId',
     validate({ params: appointmentIdParamsSchema }),

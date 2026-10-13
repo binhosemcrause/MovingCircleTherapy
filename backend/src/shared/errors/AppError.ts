@@ -27,6 +27,12 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class ForbiddenError extends AppError {
+  constructor(message = 'You do not have permission to do this') {
+    super(403, 'forbidden', message);
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message = 'Resource not found') {
     super(404, 'not_found', message);

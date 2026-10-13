@@ -22,4 +22,7 @@ export interface ITherapistRepository {
   update(id: string, input: UpdateTherapistInput): Promise<Therapist | null>;
   delete(id: string): Promise<boolean>;
   hasUpcomingAppointments(id: string): Promise<boolean>;
+  // Ties the therapist to the account they sign in with; the email is also
+  // where their booking notifications are sent.
+  linkUser(id: string, userId: string, email: string): Promise<void>;
 }

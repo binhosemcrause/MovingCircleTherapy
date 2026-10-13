@@ -6,6 +6,8 @@ export interface Therapist {
   bio: string;
   specialties: string[];
   photoUrl: string | null;
+  // The account this therapist signs in with, if they have one.
+  userId: string | null;
   // Inactive therapists are hidden from the public list and can't be booked.
   isActive: boolean;
   // Sort order in the list, lowest first.

@@ -2,6 +2,7 @@ import type { Router, RequestHandler } from 'express';
 import type { Pool } from 'pg';
 import type { PasswordHasher } from '../../shared/security/PasswordHasher';
 import type { TokenService } from '../../shared/security/TokenService';
+import { env } from '../../config/env';
 import { PgUserRepository } from '../users/infrastructure/PgUserRepository';
 import { LoginUserUseCase } from './application/LoginUserUseCase';
 import { LogoutUserUseCase } from './application/LogoutUserUseCase';
@@ -21,7 +22,7 @@ export function createAuthModule(
   const refreshTokenRepository = new PgRefreshTokenRepository(pool);
 
   const controller = new AuthController(
-    new RegisterUserUseCase(userRepository, refreshTokenRepository, passwordHasher, tokenService),
+    new RegisterUserUseCase(userRepository, refreshTokenRepository, passwordHasher, tokenService, env.ADMIN_EMAILS),
     new LoginUserUseCase(userRepository, refreshTokenRepository, passwordHasher, tokenService),
     new RefreshTokenUseCase(userRepository, refreshTokenRepository, tokenService),
     new LogoutUserUseCase(refreshTokenRepository),

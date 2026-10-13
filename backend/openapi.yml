@@ -269,6 +269,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /appointments/assigned:
+    get:
+      tags: [Appointments]
+      summary: List the sessions booked with the signed-in therapist
+      description: Oldest first. Empty when the signed-in user is not a therapist.
+      responses:
+        '200':
+          description: The therapist's sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Appointment'
+                    - type: object
+                      properties:
+                        clientName:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /appointments/{appointmentId}:
     get:
       tags: [Appointments]
@@ -453,7 +475,7 @@ paths:
                   $ref: '#/components/schemas/Therapist'
     post:
       tags: [Therapists]
-      summary: Add a therapist
+      summary: Add a therapist (admin only)
       requestBody:
         required: true
         content:
@@ -471,6 +493,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /therapists/{therapistId}:
     get:
@@ -490,7 +514,7 @@ paths:
           $ref: '#/components/responses/NotFound'
     patch:
       tags: [Therapists]
-      summary: Update a therapist
+      summary: Update a therapist (admin only)
       parameters:
         - $ref: '#/components/parameters/TherapistId'
       requestBody:
@@ -510,11 +534,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
       tags: [Therapists]
-      summary: Delete a therapist
+      summary: Delete a therapist (admin only)
       description: >-
         Refused with 409 `therapist_has_appointments` while the therapist has
         upcoming appointments; set `isActive` to false instead.
@@ -525,12 +551,62 @@ paths:
           description: Therapist deleted
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
 
   # ------------------------------------------------------------ Resources
+
+  /therapists/{therapistId}/account:
+    put:
+      tags: [Therapists]
+      summary: Give a therapist a login (admin only)
+      description: >-
+        Links the therapist to the account with this email, creating it with a
+        temporary password if it doesn't exist. The account gets the
+        `therapist` role, or `admin` if the email is in `ADMIN_EMAILS`.
+      parameters:
+        - $ref: '#/components/parameters/TherapistId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: The therapist's login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email:
+                    type: string
+                    format: email
+                  role:
+                    $ref: '#/components/schemas/UserRole'
+                  temporaryPassword:
+                    type: string
+                    nullable: true
+                    description: Only set when a new account was created; not retrievable later
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /resources:
     get:
       tags: [Resources]
@@ -642,6 +718,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: The signed-in user's role doesn't allow this
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     NotFound:
       description: Resource not found
       content:
@@ -676,6 +758,12 @@ components:
       type: string
       enum: [in_person, virtual]
 
+    UserRole:
+      type: string
+      enum: [client, therapist, admin]
+      description: >-
+        `client` by default. A therapist who is also an admin has `admin`;
+        `User.therapistId` is what marks an account as a therapist's.
     ResourceType:
       type: string
       enum: [article, worksheet, video, tool]
@@ -756,6 +844,8 @@ components:
           type: string
           format: uri
           nullable: true
+        role:
+          $ref: '#/components/schemas/UserRole'
         therapistId:
           type: string
           format: uuid
@@ -1069,6 +1159,9 @@ components:
         photoUrl:
           type: string
           nullable: true
+        hasAccount:
+          type: boolean
+          description: Whether the therapist has a login
         isActive:
           type: boolean
           description: Inactive therapists are hidden from the list and cannot be booked

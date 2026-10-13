@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import type { AppointmentStatus, SessionFormat } from '../../../shared/domain/enums';
 import { queryOpenSlots } from '../../services/infrastructure/PgAvailabilityRepository';
-import type { Appointment } from '../domain/Appointment';
+import type { Appointment, AssignedAppointment } from '../domain/Appointment';
 import type {
   BookingResult,
   CreateAppointmentInput,
@@ -58,6 +58,19 @@ export class PgAppointmentRepository implements IAppointmentRepository {
       [userId, status ?? null],
     );
     return result.rows.map(toAppointment);
+  }
+
+  async findByTherapistUser(userId: string): Promise<AssignedAppointment[]> {
+    const result = await this.pool.query<AppointmentRow & { client_name: string }>(
+      `select a.*, c.first_name || ' ' || c.last_name as client_name
+       from appointments a
+       join therapists t on t.id = a.therapist_id
+       join users c on c.id = a.user_id
+       where t.user_id = $1
+       order by a.scheduled_at`,
+      [userId],
+    );
+    return result.rows.map((row) => ({ ...toAppointment(row), clientName: row.client_name }));
   }
 
   async findById(id: string): Promise<Appointment | null> {

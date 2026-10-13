@@ -21,9 +21,16 @@ export class RegisterUserUseCase {
     private readonly refreshTokenRepository: IRefreshTokenRepository,
     private readonly passwordHasher: PasswordHasher,
     private readonly tokenService: TokenService,
+    // Admin emails: without email verification, letting anyone sign up with
+    // one would hand them the admin role.
+    private readonly reservedEmails: string[],
   ) {}
 
   async execute(input: RegisterUserInput): Promise<AuthResult> {
+    if (this.reservedEmails.includes(input.email.trim().toLowerCase())) {
+      throw new ConflictError('This email is reserved. Ask an admin for your login.', 'email_reserved');
+    }
+
     const existing = await this.userRepository.findByEmail(input.email);
     if (existing) {
       throw new ConflictError('Email is already registered.', 'email_taken');

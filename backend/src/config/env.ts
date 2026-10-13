@@ -26,6 +26,17 @@ const envSchema = z.object({
     .string()
     .default('Australia/Sydney')
     .refine(isTimeZone, 'PRACTICE_TIMEZONE must be an IANA timezone, e.g. Australia/Sydney'),
+  // Comma-separated emails of the accounts that are admins. They can't be
+  // claimed through public sign-up; an admin creates those logins.
+  ADMIN_EMAILS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+    ),
   // Booking emails to therapists are sent through Resend; with either of
   // these unset the emails are skipped.
   RESEND_API_KEY: z.string().optional(),

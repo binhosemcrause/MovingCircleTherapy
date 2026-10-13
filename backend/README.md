@@ -35,10 +35,14 @@ npm run db:migrate # apply sql/schema.sql to DATABASE_URL
 npm run db:therapist-accounts -- <slug>=<email> # give therapists a login (see scripts/createTherapistAccounts.ts)
 ```
 
+## Roles
+
+Every user has a role: `client` (the default on sign-up), `therapist`, or `admin`. Only admins can add, change or delete therapists and give them a login (`PUT /therapists/{id}/account`). Admins are the accounts listed in `ADMIN_EMAILS`; they are granted the role on boot, and those emails can't be claimed through public sign-up. A therapist who is also an admin has the `admin` role and stays linked to their therapist record.
+
 ## Availability
 
 Open booking times are not stored: they are computed from each therapist's working hours (`therapist_working_hours`, wall-clock in `PRACTICE_TIMEZONE`) and the service categories they take (`therapists.offered_categories` / `excluded_categories`), minus their live appointments. Sessions start on the hour. The team's schedule is seeded by `sql/migrations/005_add_therapist_availability.sql`; change it by editing those rows.
 
 ## Therapist notifications
 
-Booking a session stores a notification for the chosen therapist and emails them through [Resend](https://resend.com) when `RESEND_API_KEY` and `EMAIL_FROM` are set. A therapist sees their notifications in the app once their record is linked to a login — run `npm run db:therapist-accounts` with their email.
+Booking a session stores a notification for the chosen therapist and emails them through [Resend](https://resend.com) when `RESEND_API_KEY` and `EMAIL_FROM` are set. A therapist sees their sessions in the app once their record is linked to a login — an admin creates it from the Team section of their profile, or run `npm run db:therapist-accounts` with their email.

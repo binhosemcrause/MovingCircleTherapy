@@ -31,6 +31,12 @@ create type appointment_status as enum (
   'cancelled'
 );
 
+create type user_role as enum (
+  'client',
+  'therapist',
+  'admin'
+);
+
 create type resource_type as enum (
   'article',
   'worksheet',
@@ -59,6 +65,7 @@ create table users (
   location       text,
   tagline        text,
   avatar_url     text,
+  role           user_role not null default 'client',
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );

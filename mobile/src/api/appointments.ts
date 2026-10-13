@@ -30,6 +30,19 @@ export function listAppointments(): Promise<ApiAppointment[]> {
   return apiFetch<ApiAppointment[]>('/appointments');
 }
 
+export interface ApiAssignedAppointment extends ApiAppointment {
+  clientName: string;
+}
+
+// Sessions clients booked with the signed-in therapist; empty for anyone else.
+export function listAssignedAppointments(): Promise<ApiAssignedAppointment[]> {
+  return apiFetch<ApiAssignedAppointment[]>('/appointments/assigned');
+}
+
+export function cancelAppointment(appointmentId: string): Promise<void> {
+  return apiFetch<void>(`/appointments/${appointmentId}`, { method: 'DELETE' });
+}
+
 export interface BookAppointmentInput {
   serviceId: string;
   therapistId: string;

@@ -5,17 +5,24 @@ import type { TherapistsController } from './TherapistsController';
 import {
   createTherapistSchema,
   listTherapistsQuerySchema,
+  therapistAccountSchema,
   therapistIdParamsSchema,
   updateTherapistSchema,
 } from './therapists.schemas';
 
-export function createTherapistsRoutes(controller: TherapistsController, authMiddleware: RequestHandler): Router {
+// Reading the team is public; changing it is for admins.
+export function createTherapistsRoutes(
+  controller: TherapistsController,
+  authMiddleware: RequestHandler,
+  requireAdmin: RequestHandler,
+): Router {
   const router = Router();
 
   router.get('/therapists', validate({ query: listTherapistsQuerySchema }), asyncHandler(controller.list));
   router.post(
     '/therapists',
     authMiddleware,
+    requireAdmin,
     validate({ body: createTherapistSchema }),
     asyncHandler(controller.create),
   );
@@ -27,14 +34,24 @@ export function createTherapistsRoutes(controller: TherapistsController, authMid
   router.patch(
     '/therapists/:therapistId',
     authMiddleware,
+    requireAdmin,
     validate({ params: therapistIdParamsSchema, body: updateTherapistSchema }),
     asyncHandler(controller.update),
   );
   router.delete(
     '/therapists/:therapistId',
     authMiddleware,
+    requireAdmin,
     validate({ params: therapistIdParamsSchema }),
     asyncHandler(controller.delete),
+  );
+
+  router.put(
+    '/therapists/:therapistId/account',
+    authMiddleware,
+    requireAdmin,
+    validate({ params: therapistIdParamsSchema, body: therapistAccountSchema }),
+    asyncHandler(controller.createAccount),
   );
 
   return router;

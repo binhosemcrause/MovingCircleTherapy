@@ -11,6 +11,9 @@ export interface ApiUser {
   location: string | null;
   tagline: string | null;
   avatarUrl: string | null;
+  // A therapist who is also an admin has role 'admin'; therapistId is what
+  // marks an account as a therapist's.
+  role: 'client' | 'therapist' | 'admin';
   // Set when this account belongs to one of the practice's therapists.
   therapistId: string | null;
   createdAt: string;

@@ -8,6 +8,7 @@ import { PgUserRepository } from '../users/infrastructure/PgUserRepository';
 import { BookAppointmentUseCase } from './application/BookAppointmentUseCase';
 import { CancelAppointmentUseCase } from './application/CancelAppointmentUseCase';
 import { GetAppointmentUseCase } from './application/GetAppointmentUseCase';
+import { ListAssignedAppointmentsUseCase } from './application/ListAssignedAppointmentsUseCase';
 import { ListAppointmentsUseCase } from './application/ListAppointmentsUseCase';
 import { RescheduleAppointmentUseCase } from './application/RescheduleAppointmentUseCase';
 import type { IBookingNotifier } from './domain/IBookingNotifier';
@@ -38,6 +39,7 @@ export function createAppointmentsModule(
     ),
     new RescheduleAppointmentUseCase(appointmentRepository, availabilityRepository),
     new CancelAppointmentUseCase(appointmentRepository),
+    new ListAssignedAppointmentsUseCase(appointmentRepository),
     { getServiceUseCase, therapistRepository },
   );
 

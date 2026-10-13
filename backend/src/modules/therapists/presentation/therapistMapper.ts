@@ -9,6 +9,7 @@ export function toTherapistResponse(therapist: Therapist) {
     bio: therapist.bio,
     specialties: therapist.specialties,
     photoUrl: therapist.photoUrl,
+    hasAccount: therapist.userId !== null,
     isActive: therapist.isActive,
     position: therapist.position,
   };

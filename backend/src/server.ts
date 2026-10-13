@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { pool } from './shared/infrastructure/db';
 import { runMigrations } from './shared/infrastructure/runMigrations';
+import { syncAdmins } from './shared/infrastructure/syncAdmins';
 
 const app = createApp();
 
@@ -9,6 +10,7 @@ let server: ReturnType<typeof app.listen> | undefined;
 
 async function start(): Promise<void> {
   await runMigrations(pool);
+  await syncAdmins(pool, env.ADMIN_EMAILS);
   server = app.listen(env.PORT, () => {
     console.log(`Moving Circle Therapy API listening on port ${env.PORT} (${env.NODE_ENV})`);
   });

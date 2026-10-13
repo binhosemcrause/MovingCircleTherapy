@@ -13,6 +13,8 @@ import { createServicesModule } from './modules/services';
 import { createTherapistsModule } from './modules/therapists';
 import { errorHandler, notFoundHandler } from './shared/http/errorHandler';
 import { createAuthMiddleware } from './shared/http/authMiddleware';
+import { createRequireAdmin } from './shared/http/requireAdmin';
+import { PgUserRepository } from './modules/users/infrastructure/PgUserRepository';
 import { pool } from './shared/infrastructure/db';
 import { BcryptPasswordHasher } from './shared/security/BcryptPasswordHasher';
 import { JwtTokenService } from './shared/security/JwtTokenService';
@@ -29,7 +31,8 @@ export function createApp(): Express {
   const authMiddleware = createAuthMiddleware(tokenService);
 
   const services = createServicesModule(pool, authMiddleware);
-  const therapists = createTherapistsModule(pool, authMiddleware);
+  const requireAdmin = createRequireAdmin(new PgUserRepository(pool));
+  const therapists = createTherapistsModule(pool, authMiddleware, requireAdmin, passwordHasher);
   const notifications = createNotificationsModule(pool, authMiddleware);
 
   const router = express.Router();

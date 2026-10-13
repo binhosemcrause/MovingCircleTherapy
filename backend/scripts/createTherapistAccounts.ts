@@ -40,8 +40,8 @@ async function main(): Promise<void> {
       if (!userId) {
         const password = randomBytes(9).toString('base64url');
         const created = await client.query<{ id: string }>(
-          `insert into users (first_name, last_name, email, password_hash)
-           values ($1, $2, $3, $4)
+          `insert into users (first_name, last_name, email, password_hash, role)
+           values ($1, $2, $3, $4, 'therapist')
            returning id`,
           [row.first_name, row.last_name, email, await passwordHasher.hash(password)],
         );
@@ -49,6 +49,7 @@ async function main(): Promise<void> {
         outcome = `account created, temporary password: ${password}`;
       }
 
+      await client.query(`update users set role = 'therapist' where id = $1 and role = 'client'`, [userId]);
       await client.query('update therapists set user_id = $2, email = $3 where id = $1', [row.id, userId, email]);
       console.log(`${row.first_name} ${row.last_name} <${email}>: ${outcome}`);
     }

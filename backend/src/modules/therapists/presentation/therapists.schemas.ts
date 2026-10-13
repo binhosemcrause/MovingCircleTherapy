@@ -8,6 +8,10 @@ export const therapistIdParamsSchema = z.object({
   therapistId: z.string().uuid(),
 });
 
+export const therapistAccountSchema = z.object({
+  email: z.string().trim().email(),
+});
+
 const therapistFields = {
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
