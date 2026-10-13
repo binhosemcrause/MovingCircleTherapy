@@ -28,6 +28,8 @@ export interface ApiAvailabilitySlot {
   start: string;
   end: string;
   available: boolean;
+  // Therapists free for this slot.
+  therapistIds: string[];
 }
 
 // `from` / `to` are calendar dates (YYYY-MM-DD).

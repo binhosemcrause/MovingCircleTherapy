@@ -1,15 +1,19 @@
 import type { AvailabilitySlot } from './AvailabilitySlot';
 
+// Calendar dates (YYYY-MM-DD) in the practice's timezone, both inclusive.
 export interface AvailabilityDateRange {
-  from?: Date;
-  to?: Date;
+  from?: string;
+  to?: string;
+}
+
+export interface OpenSlotFilter {
+  // Only count this therapist as free.
+  therapistId?: string;
+  // Ignore this appointment when working out who is busy (rescheduling).
+  excludeAppointmentId?: string;
 }
 
 export interface IAvailabilityRepository {
-  findByService(serviceId: string, range: AvailabilityDateRange): Promise<AvailabilitySlot[]>;
-  findOpenSlot(serviceId: string, startsAt: Date): Promise<AvailabilitySlot | null>;
-  findById(id: string): Promise<AvailabilitySlot | null>;
-  findByAppointmentId(appointmentId: string): Promise<AvailabilitySlot | null>;
-  markBooked(id: string, appointmentId: string): Promise<void>;
-  release(id: string): Promise<void>;
+  findOpenSlots(serviceId: string, range: AvailabilityDateRange): Promise<AvailabilitySlot[]>;
+  findOpenSlotAt(serviceId: string, startsAt: Date, filter?: OpenSlotFilter): Promise<AvailabilitySlot | null>;
 }

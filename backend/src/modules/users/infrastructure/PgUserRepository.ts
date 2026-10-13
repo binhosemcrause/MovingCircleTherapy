@@ -12,6 +12,7 @@ interface UserRow {
   location: string | null;
   tagline: string | null;
   avatar_url: string | null;
+  therapist_id?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -27,21 +28,26 @@ function toUser(row: UserRow): User {
     location: row.location,
     tagline: row.tagline,
     avatarUrl: row.avatar_url,
+    therapistId: row.therapist_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
+const USER_COLUMNS = 'u.*, (select t.id from therapists t where t.user_id = u.id) as therapist_id';
+
 export class PgUserRepository implements IUserRepository {
   constructor(private readonly pool: Pool) {}
 
   async findById(id: string): Promise<User | null> {
-    const result = await this.pool.query<UserRow>('select * from users where id = $1', [id]);
+    const result = await this.pool.query<UserRow>(`select ${USER_COLUMNS} from users u where u.id = $1`, [id]);
     return result.rows[0] ? toUser(result.rows[0]) : null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const result = await this.pool.query<UserRow>('select * from users where email = $1', [email]);
+    const result = await this.pool.query<UserRow>(`select ${USER_COLUMNS} from users u where u.email = $1`, [
+      email,
+    ]);
     return result.rows[0] ? toUser(result.rows[0]) : null;
   }
 
@@ -57,15 +63,18 @@ export class PgUserRepository implements IUserRepository {
 
   async update(id: string, input: UpdateUserInput): Promise<User> {
     const result = await this.pool.query<UserRow>(
-      `update users
-       set first_name = coalesce($2, first_name),
-           last_name = coalesce($3, last_name),
-           phone = coalesce($4, phone),
-           location = coalesce($5, location),
-           tagline = coalesce($6, tagline),
-           avatar_url = coalesce($7, avatar_url)
-       where id = $1
-       returning *`,
+      `with u as (
+         update users
+         set first_name = coalesce($2, first_name),
+             last_name = coalesce($3, last_name),
+             phone = coalesce($4, phone),
+             location = coalesce($5, location),
+             tagline = coalesce($6, tagline),
+             avatar_url = coalesce($7, avatar_url)
+         where id = $1
+         returning *
+       )
+       select ${USER_COLUMNS} from u`,
       [
         id,
         input.firstName ?? null,

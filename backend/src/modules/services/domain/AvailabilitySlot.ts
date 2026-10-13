@@ -1,8 +1,7 @@
+// A start time at which at least one therapist can take the service.
 export interface AvailabilitySlot {
-  id: string;
-  serviceId: string;
   startsAt: Date;
   endsAt: Date;
-  isBooked: boolean;
-  appointmentId: string | null;
+  // Therapists free for this slot, in list order.
+  therapistIds: string[];
 }

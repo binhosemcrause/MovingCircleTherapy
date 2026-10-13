@@ -13,6 +13,8 @@ import { formatSessionDateTime } from './format';
 interface Props {
   service: ApiService;
   slotStart: string;
+  // Only these therapists are free for the chosen service and time.
+  therapistIds: string[];
   onBack: () => void;
   onBooked: (appointment: ApiAppointment) => void;
 }
@@ -25,7 +27,7 @@ function describeError(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
-const SelectTherapistStep = ({ service, slotStart, onBack, onBooked }: Props) => {
+const SelectTherapistStep = ({ service, slotStart, therapistIds, onBack, onBooked }: Props) => {
   const insets = useSafeAreaInsets();
   const [therapists, setTherapists] = useState<ApiTherapist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,13 +39,14 @@ const SelectTherapistStep = ({ service, slotStart, onBack, onBooked }: Props) =>
     setIsLoading(true);
     setLoadError(null);
     try {
-      setTherapists(await listTherapists());
+      const all = await listTherapists();
+      setTherapists(all.filter((therapist) => therapistIds.includes(therapist.id)));
     } catch (err) {
       setLoadError(describeError(err, 'Could not load therapists. Please check your connection and try again.'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [therapistIds]);
 
   useEffect(() => {
     fetchTherapists();
@@ -121,7 +124,7 @@ const SelectTherapistStep = ({ service, slotStart, onBack, onBooked }: Props) =>
     if (therapists.length === 0) {
       return (
         <View style={styles.state}>
-          <Text style={styles.stateText}>No therapists are available right now. Please check back soon.</Text>
+          <Text style={styles.stateText}>No therapists are available at this time. Please go back and pick another.</Text>
         </View>
       );
     }

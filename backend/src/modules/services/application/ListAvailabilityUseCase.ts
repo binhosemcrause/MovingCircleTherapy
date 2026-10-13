@@ -11,7 +11,10 @@ export interface ListAvailabilityInput {
 export interface AvailabilitySlotView {
   start: string;
   end: string;
+  // Always true: only open slots are listed.
   available: boolean;
+  // Therapists free for this slot, in list order.
+  therapistIds: string[];
 }
 
 export class ListAvailabilityUseCase {
@@ -26,15 +29,16 @@ export class ListAvailabilityUseCase {
       throw new NotFoundError('Service not found.');
     }
 
-    const slots = await this.availabilityRepository.findByService(input.serviceId, {
-      from: input.from ? new Date(input.from) : undefined,
-      to: input.to ? new Date(input.to) : undefined,
+    const slots = await this.availabilityRepository.findOpenSlots(input.serviceId, {
+      from: input.from,
+      to: input.to,
     });
 
     return slots.map((slot) => ({
       start: slot.startsAt.toISOString(),
       end: slot.endsAt.toISOString(),
-      available: !slot.isBooked,
+      available: true,
+      therapistIds: slot.therapistIds,
     }));
   }
 }

@@ -32,7 +32,7 @@ export class AppointmentsController {
   book = async (req: Request, res: Response): Promise<void> => {
     const body = req.body as {
       serviceId: string;
-      therapistId?: string;
+      therapistId: string;
       scheduledAt: string;
       format?: SessionFormat;
       notes?: string;

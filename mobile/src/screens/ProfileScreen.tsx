@@ -17,12 +17,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius, MIN_TOUCH } from '../utils/theme';
+import { colors, tones, typography, spacing, borderRadius, MIN_TOUCH } from '../utils/theme';
 import Button from '../components/Button';
 import { RootTabParamList } from '../navigation/types';
 import { ApiError, ApiUser, loginUser, registerUser } from '../api/auth';
 import { setAccessToken, clearSession } from '../api/session';
+import { formatTime } from './booking/format';
 import { ApiAppointment, listAppointments } from '../api/appointments';
+import { ApiNotification, listNotifications, markNotificationsRead } from '../api/notifications';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Profile'>;
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -158,6 +160,33 @@ const ProfileScreen = ({ navigation }: Props) => {
     }
   }, []);
 
+  const [notifications, setNotifications] = useState<ApiNotification[]>([]);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const isTherapist = !!apiUser?.therapistId;
+
+  const fetchNotifications = useCallback(async () => {
+    setNotificationsError(null);
+    try {
+      const data = await listNotifications();
+      setNotifications(data);
+      // What was just fetched keeps its "New" tag on screen; the next visit
+      // shows it as seen.
+      if (data.some((notification) => !notification.read)) {
+        markNotificationsRead().catch(() => undefined);
+      }
+    } catch (err) {
+      setNotificationsError(describeApiError(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isTherapist) {
+      return;
+    }
+    fetchNotifications();
+    return navigation.addListener('focus', fetchNotifications);
+  }, [isTherapist, fetchNotifications, navigation]);
+
   // Refetch whenever the tab regains focus too, so a session booked from
   // the Services tab shows up without logging out and in again.
   useEffect(() => {
@@ -256,6 +285,7 @@ const ProfileScreen = ({ navigation }: Props) => {
             setIsLoggedIn(false);
             setApiUser(null);
             setAppointments([]);
+            setNotifications([]);
             setShowRegisterForm(false);
             setLoginData(emptyLoginData);
             setRegisterData(emptyRegisterData);
@@ -467,6 +497,69 @@ const ProfileScreen = ({ navigation }: Props) => {
     );
   };
 
+  const renderSessionRequests = () => {
+    if (notificationsError) {
+      return (
+        <View style={styles.sessionStateContainer}>
+          <Text style={styles.sessionStateText}>{notificationsError}</Text>
+          <Button label="Try again" variant="link" onPress={fetchNotifications} />
+        </View>
+      );
+    }
+
+    if (notifications.length === 0) {
+      return (
+        <View style={styles.sessionStateContainer}>
+          <Text style={styles.sessionStateText}>No session requests yet.</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.requestList}>
+        {notifications.map((notification) => {
+          const { appointment } = notification;
+          if (!appointment) {
+            return (
+              <View key={notification.id} style={styles.sessionCard}>
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionTitle}>{notification.title}</Text>
+                  <Text style={styles.sessionTime}>{notification.body}</Text>
+                </View>
+              </View>
+            );
+          }
+
+          const { month, day } = formatSessionDate(appointment.scheduledAt);
+          const isCancelled = appointment.status === 'cancelled';
+          return (
+            <View key={notification.id} style={styles.sessionCard}>
+              <View style={styles.sessionDateBadge}>
+                <Text style={styles.sessionDateMonth}>{month}</Text>
+                <Text style={styles.sessionDateDay}>{day}</Text>
+              </View>
+              <View style={styles.sessionDetails}>
+                <Text style={styles.sessionTitle}>{appointment.clientName}</Text>
+                <Text style={styles.sessionTherapist}>{appointment.serviceName}</Text>
+                <View style={styles.sessionTimeRow}>
+                  <Ionicons name="time-outline" size={16} color={colors.textMuted} />
+                  <Text style={styles.sessionTime}>
+                    {isCancelled ? 'Cancelled' : formatTime(new Date(appointment.scheduledAt))}
+                  </Text>
+                </View>
+              </View>
+              {!notification.read && (
+                <View style={styles.newTag}>
+                  <Text style={styles.newTagText}>NEW</Text>
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   const renderInfoRow = (label: string, value: string | null | undefined, isLast = false) => (
     <View style={[styles.infoRow, isLast && styles.infoRowLast]}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -524,6 +617,15 @@ const ProfileScreen = ({ navigation }: Props) => {
           {renderInfoRow('LOCATION', apiUser?.location, true)}
         </View>
       </View>
+
+      {isTherapist && (
+        <View style={styles.profileSection}>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            Session requests
+          </Text>
+          {renderSessionRequests()}
+        </View>
+      )}
 
       <View style={styles.profileSection}>
         <Text style={styles.sectionTitle} accessibilityRole="header">
@@ -777,6 +879,23 @@ const styles = StyleSheet.create({
   sessionTime: {
     ...typography.label,
     color: colors.textMuted,
+  },
+  requestList: {
+    gap: spacing.sm,
+  },
+  newTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: tones.accent.background,
+    borderRadius: borderRadius.round,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  newTagText: {
+    ...typography.label,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 1,
+    color: tones.accent.text,
   },
   sessionStateContainer: {
     backgroundColor: colors.dominant2,

@@ -122,7 +122,8 @@ create table service_features (
 create index service_features_service_id_idx on service_features (service_id, position);
 
 -- ------------------------------------------------------------ Therapists
--- Rows are seeded by sql/migrations/004_add_therapists.sql.
+-- Rows are seeded by sql/migrations/004_add_therapists.sql, and their
+-- schedule by 005_add_therapist_availability.sql.
 
 create table therapists (
   id           uuid primary key default gen_random_uuid(),
@@ -134,6 +135,12 @@ create table therapists (
   specialties  text[] not null default '{}',
   photo_url    text,
   email        citext,
+  -- The account this therapist signs in with, if they have one.
+  user_id      uuid references users (id) on delete set null,
+  -- offered_categories null means every category; excluded_categories is
+  -- then taken away from whatever is offered.
+  offered_categories   service_category[],
+  excluded_categories  service_category[] not null default '{}',
   position     integer not null default 0,
   is_active    boolean not null default true,
   created_at   timestamptz not null default now(),
@@ -141,6 +148,7 @@ create table therapists (
 );
 
 create unique index therapists_slug_key on therapists (slug);
+create unique index therapists_user_id_key on therapists (user_id);
 
 create trigger therapists_set_updated_at
   before update on therapists
@@ -179,7 +187,7 @@ create trigger appointments_set_updated_at
 
 -- ------------------------------------------------ Therapist notifications
 -- Written in the same transaction as the booking. delivered_at stays null
--- until a delivery channel (email / push) picks the row up.
+-- until the therapist has been emailed.
 
 create table therapist_notifications (
   id              uuid primary key default gen_random_uuid(),
@@ -199,26 +207,19 @@ create index therapist_notifications_undelivered_idx
   on therapist_notifications (created_at) where delivered_at is null;
 
 -- ---------------------------------------------------------- Availability
+-- Open booking times are computed from each therapist's working hours minus
+-- their live appointments. Times are wall-clock in the practice's timezone
+-- (PRACTICE_TIMEZONE); weekday follows extract(dow): 0 = Sunday.
 
-create table availability_slots (
-  id              uuid primary key default gen_random_uuid(),
-  service_id      uuid not null references services (id) on delete cascade,
-  starts_at       timestamptz not null,
-  ends_at         timestamptz not null,
-  is_booked       boolean not null default false,
-  appointment_id  uuid references appointments (id) on delete set null,
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now(),
-  constraint availability_slots_range_check check (ends_at > starts_at)
+create table therapist_working_hours (
+  therapist_id  uuid not null references therapists (id) on delete cascade,
+  weekday       smallint not null,
+  start_time    time not null,
+  end_time      time not null,
+  primary key (therapist_id, weekday),
+  constraint therapist_working_hours_weekday_check check (weekday between 0 and 6),
+  constraint therapist_working_hours_range_check check (end_time > start_time)
 );
-
-create unique index availability_slots_service_starts_key on availability_slots (service_id, starts_at);
-create index availability_slots_service_id_idx on availability_slots (service_id, starts_at);
-create index availability_slots_appointment_id_idx on availability_slots (appointment_id);
-
-create trigger availability_slots_set_updated_at
-  before update on availability_slots
-  for each row execute function set_updated_at();
 
 -- ------------------------------------------------------------- Resources
 

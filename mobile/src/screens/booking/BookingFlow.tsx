@@ -17,6 +17,8 @@ interface Props {
 // server-side.
 const BookingFlow = ({ service, onCancel, onReturnHome }: Props) => {
   const [slotStart, setSlotStart] = useState<string | null>(null);
+  // Therapists who work that day, take this service and are free at slotStart.
+  const [therapistIds, setTherapistIds] = useState<string[]>([]);
   const [isChoosingTherapist, setIsChoosingTherapist] = useState(false);
   const [appointment, setAppointment] = useState<ApiAppointment | null>(null);
 
@@ -29,6 +31,7 @@ const BookingFlow = ({ service, onCancel, onReturnHome }: Props) => {
       <SelectTherapistStep
         service={service}
         slotStart={slotStart}
+        therapistIds={therapistIds}
         onBack={() => setIsChoosingTherapist(false)}
         onBooked={setAppointment}
       />
@@ -40,8 +43,9 @@ const BookingFlow = ({ service, onCancel, onReturnHome }: Props) => {
       service={service}
       initialSlot={slotStart}
       onBack={onCancel}
-      onContinue={(slot) => {
+      onContinue={(slot, availableTherapistIds) => {
         setSlotStart(slot);
+        setTherapistIds(availableTherapistIds);
         setIsChoosingTherapist(true);
       }}
     />

@@ -261,8 +261,9 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '409':
           description: >-
-            The slot is no longer available (`slot_unavailable`) or the chosen
-            therapist is already booked at that time (`therapist_unavailable`)
+            The chosen therapist can't take the session at that time
+            (`therapist_unavailable`): it is outside their working hours, they
+            don't offer the service, or they are already booked
           content:
             application/json:
               schema:
@@ -330,16 +331,24 @@ paths:
     get:
       tags: [Appointments]
       summary: List available booking slots for a service
+      description: >-
+        Open start times, worked out from the working hours of the therapists
+        who offer the service minus their booked sessions. Only open slots
+        are returned.
       security: []
       parameters:
         - $ref: '#/components/parameters/ServiceId'
         - name: from
           in: query
+          description: First day, in the practice's timezone. Defaults to today.
           schema:
             type: string
             format: date
         - name: to
           in: query
+          description: >-
+            Last day (inclusive), in the practice's timezone. Defaults to 30
+            days after `from`; capped at 92 days after it.
           schema:
             type: string
             format: date
@@ -387,6 +396,36 @@ paths:
                 $ref: '#/components/schemas/User'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # -------------------------------------------------------- Notifications
+  /notifications:
+    get:
+      tags: [Therapists]
+      summary: List the signed-in therapist's notifications
+      description: >-
+        Newest first. Empty when the signed-in user is not a therapist
+        (`User.therapistId` is null).
+      responses:
+        '200':
+          description: The therapist's notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TherapistNotification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/read:
+    post:
+      tags: [Therapists]
+      summary: Mark all of the signed-in therapist's notifications as read
+      responses:
+        '204':
+          description: Notifications marked as read
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -717,6 +756,11 @@ components:
           type: string
           format: uri
           nullable: true
+        therapistId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when this account belongs to one of the practice's therapists
         createdAt:
           type: string
           format: date-time
@@ -908,11 +952,18 @@ components:
           format: date-time
         available:
           type: boolean
+          description: Always true; only open slots are listed
+        therapistIds:
+          type: array
+          description: Therapists free for this slot, in list order
+          items:
+            type: string
+            format: uuid
 
     # ---- Appointments
     AppointmentRequest:
       type: object
-      required: [serviceId, scheduledAt]
+      required: [serviceId, therapistId, scheduledAt]
       properties:
         serviceId:
           type: string
@@ -921,8 +972,8 @@ components:
           type: string
           format: uuid
           description: >-
-            The therapist the client chose. When set, a notification is
-            recorded for that therapist as part of the booking.
+            The therapist the client chose, from the slot's `therapistIds`.
+            They get an in-app notification and an email about the booking.
         scheduledAt:
           type: string
           format: date-time
@@ -961,6 +1012,42 @@ components:
           format: date-time
 
     # ---- Therapists
+    TherapistNotification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          example: appointment_booked
+        title:
+          type: string
+        body:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        appointment:
+          type: object
+          nullable: true
+          description: The session the notification is about, as it stands now
+          properties:
+            id:
+              type: string
+              format: uuid
+            scheduledAt:
+              type: string
+              format: date-time
+            status:
+              $ref: '#/components/schemas/AppointmentStatus'
+            serviceName:
+              type: string
+            clientName:
+              type: string
+
     Therapist:
       type: object
       properties:

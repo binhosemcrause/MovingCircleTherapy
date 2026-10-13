@@ -10,6 +10,7 @@ import { CancelAppointmentUseCase } from './application/CancelAppointmentUseCase
 import { GetAppointmentUseCase } from './application/GetAppointmentUseCase';
 import { ListAppointmentsUseCase } from './application/ListAppointmentsUseCase';
 import { RescheduleAppointmentUseCase } from './application/RescheduleAppointmentUseCase';
+import type { IBookingNotifier } from './domain/IBookingNotifier';
 import { PgAppointmentRepository } from './infrastructure/PgAppointmentRepository';
 import { AppointmentsController } from './presentation/AppointmentsController';
 import { createAppointmentsRoutes } from './presentation/appointments.routes';
@@ -21,6 +22,7 @@ export function createAppointmentsModule(
   availabilityRepository: IAvailabilityRepository,
   getServiceUseCase: GetServiceUseCase,
   therapistRepository: ITherapistRepository,
+  bookingNotifier: IBookingNotifier,
 ): Router {
   const appointmentRepository = new PgAppointmentRepository(pool);
 
@@ -30,12 +32,12 @@ export function createAppointmentsModule(
     new BookAppointmentUseCase(
       appointmentRepository,
       serviceRepository,
-      availabilityRepository,
       therapistRepository,
       new PgUserRepository(pool),
+      bookingNotifier,
     ),
     new RescheduleAppointmentUseCase(appointmentRepository, availabilityRepository),
-    new CancelAppointmentUseCase(appointmentRepository, availabilityRepository),
+    new CancelAppointmentUseCase(appointmentRepository),
     { getServiceUseCase, therapistRepository },
   );
 

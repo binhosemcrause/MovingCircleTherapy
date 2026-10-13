@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "db:seed:availability": "tsx scripts/seedAvailability.ts",
+    "db:therapist-accounts": "tsx scripts/createTherapistAccounts.ts",
     "db:migrate": "node -e \"require('dotenv').config(); const fs=require('fs'); const {Pool}=require('pg'); const pool=new Pool({connectionString:process.env.DATABASE_URL}); pool.query(fs.readFileSync('sql/schema.sql','utf8')).then(()=>{console.log('schema applied');pool.end();}).catch(e=>{console.error(e);pool.end();process.exit(1);});\""
   },
   "dependencies": {

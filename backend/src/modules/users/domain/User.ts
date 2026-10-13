@@ -8,6 +8,8 @@ export interface User {
   location: string | null;
   tagline: string | null;
   avatarUrl: string | null;
+  // Set when this account belongs to one of the practice's therapists.
+  therapistId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,7 @@ export interface PublicUser {
   location: string | null;
   tagline: string | null;
   avatarUrl: string | null;
+  therapistId: string | null;
   createdAt: string;
 }
 
@@ -34,6 +37,7 @@ export function toPublicUser(user: User): PublicUser {
     location: user.location,
     tagline: user.tagline,
     avatarUrl: user.avatarUrl,
+    therapistId: user.therapistId,
     createdAt: user.createdAt.toISOString(),
   };
 }

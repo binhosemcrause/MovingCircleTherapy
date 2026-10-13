@@ -13,7 +13,7 @@ interface Props {
   // ISO start of the slot picked earlier, when coming back from the next step.
   initialSlot: string | null;
   onBack: () => void;
-  onContinue: (slotStart: string) => void;
+  onContinue: (slotStart: string, therapistIds: string[]) => void;
 }
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -27,6 +27,7 @@ const SelectDateStep = ({ service, initialSlot, onBack, onContinue }: Props) => 
   const [selectedDay, setSelectedDay] = useState<string | null>(initialSlot ? dayKey(new Date(initialSlot)) : null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(initialSlot);
   const [slotsByDay, setSlotsByDay] = useState<Record<string, string[]>>({});
+  const [therapistsBySlot, setTherapistsBySlot] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,13 +35,14 @@ const SelectDateStep = ({ service, initialSlot, onBack, onContinue }: Props) => 
     setIsLoading(true);
     setError(null);
     try {
-      // The API filters by calendar date in the server's timezone, so ask
+      // The API filters by calendar date in the practice's timezone, so ask
       // for a day either side and keep only this month's local days below.
       const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
       const slots = await listAvailability(service.id, dayKey(addDays(month, -1)), dayKey(addDays(nextMonth, 1)));
 
       const now = Date.now();
       const grouped: Record<string, string[]> = {};
+      const therapists: Record<string, string[]> = {};
       slots
         .filter((slot) => slot.available && new Date(slot.start).getTime() > now)
         .forEach((slot) => {
@@ -49,8 +51,10 @@ const SelectDateStep = ({ service, initialSlot, onBack, onContinue }: Props) => 
             return;
           }
           (grouped[dayKey(start)] ??= []).push(slot.start);
+          therapists[slot.start] = slot.therapistIds;
         });
       setSlotsByDay(grouped);
+      setTherapistsBySlot(therapists);
     } catch (err) {
       setSlotsByDay({});
       setError(
@@ -265,7 +269,7 @@ const SelectDateStep = ({ service, initialSlot, onBack, onContinue }: Props) => 
         variant="accent"
         icon="arrow-forward"
         disabled={!selectedSlot}
-        onPress={() => selectedSlot && onContinue(selectedSlot)}
+        onPress={() => selectedSlot && onContinue(selectedSlot, therapistsBySlot[selectedSlot] ?? [])}
         style={styles.continueButton}
       />
     </ScrollView>

@@ -6,6 +6,7 @@ import { createAppointmentsModule } from './modules/appointments';
 import { createAuthModule } from './modules/auth';
 import { createDocsModule } from './modules/docs';
 import { createEnquiriesModule } from './modules/enquiries';
+import { createNotificationsModule } from './modules/notifications';
 import { createProfileModule } from './modules/profile';
 import { createResourcesModule } from './modules/resources';
 import { createServicesModule } from './modules/services';
@@ -29,6 +30,7 @@ export function createApp(): Express {
 
   const services = createServicesModule(pool, authMiddleware);
   const therapists = createTherapistsModule(pool, authMiddleware);
+  const notifications = createNotificationsModule(pool, authMiddleware);
 
   const router = express.Router();
   router.use(createAuthModule(pool, passwordHasher, tokenService, authMiddleware));
@@ -43,8 +45,10 @@ export function createApp(): Express {
       services.availabilityRepository,
       services.getServiceUseCase,
       therapists.therapistRepository,
+      { appointmentBooked: (appointmentId) => notifications.emailAppointmentNotificationsUseCase.execute(appointmentId) },
     ),
   );
+  router.use(notifications.router);
   router.use(createResourcesModule(pool));
   router.use(createEnquiriesModule(pool));
 

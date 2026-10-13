@@ -11,6 +11,8 @@ export interface ApiUser {
   location: string | null;
   tagline: string | null;
   avatarUrl: string | null;
+  // Set when this account belongs to one of the practice's therapists.
+  therapistId: string | null;
   createdAt: string;
 }
 

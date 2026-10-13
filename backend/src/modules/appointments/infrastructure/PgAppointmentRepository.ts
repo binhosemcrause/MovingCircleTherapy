@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { AppointmentStatus, SessionFormat } from '../../../shared/domain/enums';
+import { queryOpenSlots } from '../../services/infrastructure/PgAvailabilityRepository';
 import type { Appointment } from '../domain/Appointment';
 import type {
   BookingResult,
@@ -85,54 +86,38 @@ export class PgAppointmentRepository implements IAppointmentRepository {
     return toAppointment(result.rows[0]!);
   }
 
-  async hasLiveAppointmentAt(therapistId: string, scheduledAt: Date, excludeAppointmentId?: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `select 1 from appointments
-       where therapist_id = $1 and scheduled_at = $2 and status <> 'cancelled'
-         and ($3::uuid is null or id <> $3)
-       limit 1`,
-      [therapistId, scheduledAt, excludeAppointmentId ?? null],
-    );
-    return result.rows.length > 0;
-  }
-
-  async bookWithSlot(slotId: string, input: CreateAppointmentInput): Promise<BookingResult> {
+  async book(input: CreateAppointmentInput): Promise<BookingResult> {
     const client = await this.pool.connect();
     try {
       await client.query('begin');
 
-      const reserved = await client.query('update availability_slots set is_booked = true where id = $1 and is_booked = false returning id', [
-        slotId,
-      ]);
-      if (reserved.rowCount === 0) {
+      // Serialises bookings per therapist, so two overlapping requests can't
+      // both pass the open-slot check below.
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [input.therapistId]);
+
+      const open = await queryOpenSlots(client, {
+        serviceId: input.serviceId,
+        at: input.scheduledAt,
+        therapistId: input.therapistId,
+      });
+      if (open.length === 0) {
         await client.query('rollback');
-        return { conflict: 'slot_unavailable' };
+        return { conflict: 'therapist_unavailable' };
       }
 
       const inserted = await client.query<AppointmentRow>(
         `insert into appointments (user_id, service_id, therapist_id, scheduled_at, format, notes)
          values ($1, $2, $3, $4, $5, $6)
          returning *`,
-        [
-          input.userId,
-          input.serviceId,
-          input.therapistId ?? null,
-          input.scheduledAt,
-          input.format,
-          input.notes ?? null,
-        ],
+        [input.userId, input.serviceId, input.therapistId, input.scheduledAt, input.format, input.notes ?? null],
       );
       const appointment = toAppointment(inserted.rows[0]!);
 
-      await client.query('update availability_slots set appointment_id = $2 where id = $1', [slotId, appointment.id]);
-
-      if (input.therapistId && input.therapistNotification) {
-        await client.query(
-          `insert into therapist_notifications (therapist_id, appointment_id, type, title, body)
-           values ($1, $2, 'appointment_booked', $3, $4)`,
-          [input.therapistId, appointment.id, input.therapistNotification.title, input.therapistNotification.body],
-        );
-      }
+      await client.query(
+        `insert into therapist_notifications (therapist_id, appointment_id, type, title, body)
+         values ($1, $2, 'appointment_booked', $3, $4)`,
+        [input.therapistId, appointment.id, input.therapistNotification.title, input.therapistNotification.body],
+      );
 
       await client.query('commit');
       return { appointment };
